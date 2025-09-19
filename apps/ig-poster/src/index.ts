@@ -1420,6 +1420,30 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), tunnel: { url: tunnelUrl, active: !!tunnelUrl } });
 });
 
+// License endpoints
+app.get('/license/status', (_req, res) => {
+  try {
+    const lic = require('./license/validator') as typeof import('./license/validator');
+    const st = lic.getLicenseStatus();
+    res.json(st);
+  } catch (e: any) {
+    res.json({ valid: false });
+  }
+});
+
+app.post('/license/activate', (req, res) => {
+  try {
+    const { email, key } = (req.body || {}) as { email?: string; key?: string };
+    if (!email || !key) return res.status(400).json({ error: 'missing_fields' });
+    const lic = require('./license/validator') as typeof import('./license/validator');
+    const ok = lic.activateLicense(email, key);
+    if (!ok) return res.status(400).json({ error: 'invalid_license' });
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ error: 'server_error' });
+  }
+});
+
 // ==============================
 // Facebook API endpoints (Pro)
 // ==============================

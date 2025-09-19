@@ -1,0 +1,18 @@
+appId: com.bulkigpro.app
+productName: BulkIG Pro
+directories:
+  output: dist-electron
+files:
+  - assets/**/*
+  - apps/ig-poster/dist/**/*
+  - apps/ig-poster/public/**/*
+win:
+  target: nsis
+  icon: assets/icon.ico
+mac:
+  target: dmg
+  icon: assets/icon.icns
+  category: public.app-category.productivity
+linux:
+  target: AppImage
+  icon: assets/icon.png

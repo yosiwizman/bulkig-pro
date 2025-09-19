@@ -1397,6 +1397,25 @@
   </div>
   
   <div id="toasts"></div>
+
+  <!-- License Activation Modal -->
+  <div id="licenseModal" class="modal-overlay" style="z-index:20000;">
+    <div class="modal-container" style="max-width: 420px; width: 92%;">
+      <div class="modal-header">
+        <h2 class="modal-title">🔐 Activate BulkIG Pro</h2>
+      </div>
+      <div class="modal-body">
+        <div class="muted" style="margin-bottom:8px;">Enter your email and license key to continue.</div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <input id="licEmail" type="email" placeholder="you@example.com" style="padding:10px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;">
+          <input id="licKey" type="text" placeholder="XXXX-XXXX-XXXX-XXXX" style="padding:10px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px; text-transform:uppercase;">
+          <div id="licError" class="muted" style="color:#ef4444; min-height:18px;"></div>
+          <button id="btnActivate" style="padding:10px; background:#22c55e; color:#fff; border:none; border-radius:6px; cursor:pointer;">Activate</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     // Modal functions
     function openModal(modalId) {
@@ -1427,6 +1446,41 @@
     window.openModal = openModal;
     window.closeModal = closeModal;
     
+    async function ensureLicense() {
+      try {
+        const r = await fetch('/license/status');
+        const j = await r.json();
+        if (!j || j.valid !== true) {
+          const modal = document.getElementById('licenseModal');
+          if (modal) modal.classList.add('show');
+          const btn = document.getElementById('btnActivate');
+          const email = document.getElementById('licEmail');
+          const key = document.getElementById('licKey');
+          const err = document.getElementById('licError');
+          if (btn) btn.addEventListener('click', async () => {
+            try {
+              btn.disabled = true; btn.textContent = '⏳ Verifying...';
+              const body = { email: email.value || '', key: key.value || '' };
+              const r2 = await fetch('/license/activate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+              if (!r2.ok) {
+                const t = await r2.json().catch(()=>({error:'invalid'}));
+                if (err) err.textContent = t && t.error ? String(t.error) : 'Activation failed';
+              } else {
+                if (err) err.textContent = '';
+                const modal2 = document.getElementById('licenseModal');
+                if (modal2) modal2.classList.remove('show');
+                showToast('success', 'License activated');
+              }
+            } catch (e) {
+              if (err) err.textContent = 'Activation error';
+            } finally {
+              btn.disabled = false; btn.textContent = 'Activate';
+            }
+          });
+        }
+      } catch {}
+    }
+
     const els = {
       autorunBtn: document.getElementById('btnAutorun'),
       planBtn: document.getElementById('btnPlan'),
@@ -4138,6 +4192,9 @@
 
     window.selectDraftForMedia = selectDraftForMedia;
     window.openDraftPicker = openDraftPicker;
+
+    // License check at startup
+    ensureLicense().catch(()=>{});
 
     // Convert inline onclick buttons to addEventListener bindings
     document.getElementById('activityLogBtn')?.addEventListener('click', openActivityLog);
