@@ -1279,6 +1279,26 @@
               <textarea id="postCaption" placeholder="Write your caption here..." 
                 style="width: 100%; min-height: 200px; padding: 12px; background: #0f172a; color: #e6e6e6; border: 1px solid #1e2a44; border-radius: 6px; resize: vertical; font-size: 14px; line-height: 1.5;"></textarea>
             </div>
+
+            <!-- Platform Selector -->
+            <div class="platform-selector" style="margin-bottom: 16px; padding: 12px; background: #0f172a; border: 1px solid #1e2a44; border-radius: 6px;">
+              <h4 style="margin: 0 0 8px 0;">Post to:</h4>
+              <div class="platform-options" style="display:flex; gap:16px; align-items:center;">
+                <label style="display:flex; align-items:center; gap:6px;">
+                  <input type="checkbox" id="postToInstagram" checked>
+                  <span>📷 Instagram</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:6px;">
+                  <input type="checkbox" id="postToFacebook">
+                  <span>📘 Facebook</span>
+                </label>
+              </div>
+              <div id="facebookPageSelector" style="display:none; margin-top: 8px;">
+                <select id="facebookPageSelect" style="background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px; padding:6px; min-width: 260px;">
+                  <option value="">Select Facebook Page</option>
+                </select>
+              </div>
+            </div>
             <div class="row" style="gap:8px; margin: 8px 0 12px 0; flex-wrap: wrap;">
               <button id="btnClearCaption" class="secondary">🧹 Clear</button>
               <button id="btnQuickRegen" class="secondary">♻ Regenerate</button>
@@ -3259,6 +3279,21 @@
       });
     });
     
+    function getSelectedPlatforms(){
+      const ig = document.getElementById('postToInstagram');
+      const fb = document.getElementById('postToFacebook');
+      const select = document.getElementById('facebookPageSelect');
+      const instagram = !ig || !!ig.checked; // default true
+      let facebook = undefined;
+      if (fb && fb.checked) {
+        const val = String(select?.value || '');
+        const [pageId, pageToken] = val.includes(':') ? val.split(':') : [val, ''];
+        const pageName = select && select.selectedIndex >= 0 ? select.options[select.selectedIndex].text : '';
+        if (pageId) facebook = { enabled: true, pageId, pageName, pageAccessToken: pageToken || undefined };
+      }
+      return { instagram, facebook };
+    }
+
     // Post Now button
     const btnPostNow = document.getElementById('btnPostNow');
     if (btnPostNow) {
@@ -3316,14 +3351,15 @@
             postStatusMessage.textContent = 'Publishing to Instagram...';
           }
           
-          // Then publish immediately with post type
+          // Then publish immediately with post type and platforms
           await fetchJSON('/ig/post-now', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               filename: uploadedFile.name,
               caption: caption,
-              postType: postType
+              postType: postType,
+              platforms: getSelectedPlatforms()
             })
           });
           
@@ -3486,6 +3522,37 @@
     // Quick-schedule state
     let quickSchedule = null; // { filename, caption }
 
+    // Facebook page selector logic
+    const fbToggle = document.getElementById('postToFacebook');
+    if (fbToggle) {
+      fbToggle.addEventListener('change', async (e) => {
+        const selWrap = document.getElementById('facebookPageSelector');
+        const select = document.getElementById('facebookPageSelect');
+        if (e && e.target && e.target.checked) {
+          try {
+            const r = await fetch('/fb/pages');
+            const data = await r.json();
+            const pages = (data && data.pages) || [];
+            if (Array.isArray(pages) && pages.length) {
+              select.innerHTML = '<option value="">Select Facebook Page</option>' +
+                pages.map((p) => `<option value="${p.id}:${p.access_token}">${p.name}</option>`).join('');
+              selWrap.style.display = 'block';
+            } else {
+              showToast('No Facebook pages found', 'error');
+              if (e && e.target) e.target.checked = false;
+              selWrap.style.display = 'none';
+            }
+          } catch (err) {
+            showToast('Failed to load Facebook pages', 'error');
+            if (e && e.target) e.target.checked = false;
+            selWrap.style.display = 'none';
+          }
+        } else {
+          selWrap.style.display = 'none';
+        }
+      });
+    }
+
     // Confirm Schedule button
     document.getElementById('btnConfirmSchedule')?.addEventListener('click', async () => {
       const dateInput = document.getElementById('scheduleDate');
@@ -3507,7 +3574,7 @@
         if (quickSchedule && quickSchedule.filename) {
           await fetchJSON('/ig/schedule-post', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filename: quickSchedule.filename, scheduled_at: scheduledAt, caption: quickSchedule.caption || '' })
+            body: JSON.stringify({ filename: quickSchedule.filename, scheduled_at: scheduledAt, caption: quickSchedule.caption || '', platforms: getSelectedPlatforms() })
           });
         } else {
           // First upload the file
@@ -3517,7 +3584,7 @@
           // Then schedule the post
           await fetchJSON('/ig/schedule-post', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filename: uploadedFile.name, scheduled_at: scheduledAt, caption: caption })
+            body: JSON.stringify({ filename: uploadedFile.name, scheduled_at: scheduledAt, caption: caption, platforms: getSelectedPlatforms() })
           });
         }
         

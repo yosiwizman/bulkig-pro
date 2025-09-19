@@ -9,6 +9,15 @@ Enhanced version with dual-platform support.
 ## Migration from BulkIG
 Run `pnpm migrate` to import drafts from the original installation.
 
+## Platform Support
+- Instagram: Feed posts, Reels, supported media types
+- Facebook: Page posts with images and videos
+
+## Features
+- ✅ Dual-platform posting (Instagram + Facebook)
+- ✅ Single Meta API setup for both platforms
+- ✅ Platform-specific scheduling
+
 [![CI/CD](https://github.com/yosiwizman/bulkig/workflows/CI/badge.svg)](https://github.com/yosiwizman/bulkig/actions)
 [![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)

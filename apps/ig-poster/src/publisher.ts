@@ -1,4 +1,5 @@
 import path from 'path';
+import fetch from 'node-fetch';
 import { Post } from './types';
 import { Scheduler } from './scheduler';
 import { igCreateContainer, igWaitFinished, igPublish } from './ig';
@@ -53,45 +54,87 @@ export class Publisher {
 
       this.scheduler.updatePost(post.id, { status: 'PUBLISHING' });
 
+      // Determine platform selection (default instagram on)
+      const platforms = (post as any).platforms || { instagram: true };
+
       // Prefer public tunnel URL if available for IG
       const publicUrl = (!cfg.mock && tunnelUrl)
         ? `${tunnelUrl}/static/${encodeURIComponent(path.basename(post.filename))}`
         : post.image_url;
 
-      const creationId = await igCreateContainer(
-        cfg.igUserId,
-        cfg.fbToken,
-        publicUrl,
-        post.caption
-      );
-
-      await igWaitFinished(creationId, cfg.fbToken);
-
-      const mediaId = await igPublish(cfg.igUserId, cfg.fbToken, creationId);
-
-      this.scheduler.updatePost(post.id, {
-        status: 'PUBLISHED',
-        published_at: new Date(),
-        ig_media_id: mediaId,
-      });
-
-      // If this post originated from a draft, mark it used
-      const draftId = (post as any).draftId as string | undefined;
-      if (draftId) {
+      let igOk = false;
+      if (platforms.instagram !== false) {
         try {
-          const idx = (require('./index') as any).captionDrafts?.findIndex?.((d: any) => d.id === draftId);
-          if (typeof idx === 'number' && idx >= 0) {
-            const mod = require('./index') as any;
-            mod.captionDrafts[idx].status = 'used';
-            mod.saveDraftsToFile?.();
-            addLog('info', `[DRAFTS] Post published using ${draftId}`, undefined, 'SUCCESS');
+          const creationId = await igCreateContainer(
+            cfg.igUserId,
+            cfg.fbToken,
+            publicUrl,
+            post.caption
+          );
+          await igWaitFinished(creationId, cfg.fbToken);
+          const mediaId = await igPublish(cfg.igUserId, cfg.fbToken, creationId);
+
+          this.scheduler.updatePost(post.id, {
+            status: 'PUBLISHED',
+            published_at: new Date(),
+            ig_media_id: mediaId,
+          });
+
+          // If this post originated from a draft, mark it used
+          const draftId = (post as any).draftId as string | undefined;
+          if (draftId) {
+            try {
+              const idx = (require('./index') as any).captionDrafts?.findIndex?.((d: any) => d.id === draftId);
+              if (typeof idx === 'number' && idx >= 0) {
+                const mod = require('./index') as any;
+                mod.captionDrafts[idx].status = 'used';
+                mod.saveDraftsToFile?.();
+                addLog('info', `[DRAFTS] Post published using ${draftId}`, undefined, 'SUCCESS');
+              }
+            } catch {}
           }
-        } catch {}
+          const ok = `[PUBLISHER] Successfully published to Instagram: ${post.filename}`;
+          console.log(ok);
+          addLog('info', ok, undefined, 'SUCCESS');
+          igOk = true;
+        } catch (e: any) {
+          const emsg = `[PUBLISHER] Instagram publish failed for ${post.filename}: ${e?.message || e}`;
+          console.error(emsg);
+          addLog('error', emsg);
+        }
       }
 
-      const ok = `[PUBLISHER] Successfully published: ${post.filename} -> ${mediaId}`;
-      console.log(ok);
-      addLog('info', ok);
+      // Facebook posting (optional)
+      let fbOk = false;
+      if (platforms.facebook && platforms.facebook.enabled) {
+        try {
+          const resp = await fetch(`http://localhost:${cfg.port}/fb/publish`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              caption: post.caption,
+              filename: post.filename,
+              pageId: platforms.facebook.pageId,
+              pageAccessToken: platforms.facebook.pageAccessToken || undefined,
+            })
+          });
+          if (!resp.ok) {
+            const txt = await resp.text().catch(()=> '');
+            throw new Error(`HTTP ${resp.status} ${txt}`);
+          }
+          addLog('info', `[PUBLISHER] Successfully published to Facebook: ${post.filename}`, undefined, 'SUCCESS');
+          fbOk = true;
+        } catch (e: any) {
+          const emsg = `[PUBLISHER] Facebook publish failed for ${post.filename}: ${e?.message || e}`;
+          console.error(emsg);
+          addLog('error', emsg);
+        }
+      }
+
+      // Final status handling: keep PUBLISHED if IG succeeded; set ERROR only if neither succeeded
+      if (!igOk && !(platforms.facebook && platforms.facebook.enabled && fbOk)) {
+        this.scheduler.updatePost(post.id, { status: 'ERROR', error_message: 'No platform succeeded' });
+      }
     } catch (error) {
       const emsg = `[PUBLISHER] Error publishing ${post.filename}`;
       console.error(emsg, error);

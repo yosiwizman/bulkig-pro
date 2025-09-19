@@ -295,11 +295,12 @@ app.get('/ig/schedule-preview', (req, res) => {
 // Force a specific post to publish ASAP
 app.post('/ig/post-now', (req, res) => {
   try {
-    const { id, filename, caption, postType } = req.body as { 
+    const { id, filename, caption, postType, platforms } = req.body as { 
       id?: string; 
       filename?: string; 
       caption?: string;
       postType?: 'POST' | 'STORY' | 'REEL';
+      platforms?: any;
     };
     const state = scheduler.getState();
     let post = state.posts.find(p => (id && p.id === id) || (filename && p.filename === filename));
@@ -314,7 +315,7 @@ app.post('/ig/post-now', (req, res) => {
     
     // If no existing post, create one
     if (!post && filename) {
-      post = scheduler.queueFile(filename);
+      post = scheduler.queueFile(filename, platforms ? ({ platforms } as any) : undefined);
       if (caption) {
         scheduler.updatePost(post.id, { caption });
       }
@@ -338,7 +339,9 @@ app.post('/ig/post-now', (req, res) => {
     }
     
     // Move to immediate publish window
-    scheduler.updatePost(post.id, { status: 'SCHEDULED', scheduled_at: new Date(Date.now() - 1000) });
+    const patch: any = { status: 'SCHEDULED', scheduled_at: new Date(Date.now() - 1000) };
+    if (platforms) patch.platforms = platforms;
+    scheduler.updatePost(post.id, patch);
     addLog('info', `[API] ${type} Now requested for ${post.filename}`);
     publisher.kick().catch(() => {});
     res.json({ success: true, postType: type });
@@ -350,10 +353,11 @@ app.post('/ig/post-now', (req, res) => {
 // Schedule a post for a specific date/time
 app.post('/ig/schedule-post', (req, res) => {
   try {
-    const { filename, caption, scheduled_at } = req.body as { 
+    const { filename, caption, scheduled_at, platforms } = req.body as { 
       filename: string; 
       caption?: string; 
       scheduled_at: string;
+      platforms?: any;
     };
     
     if (!filename || !scheduled_at) {
@@ -374,11 +378,13 @@ app.post('/ig/schedule-post', (req, res) => {
     }
     
     // Update with schedule info
-    scheduler.updatePost(post.id, {
+    const patch: any = {
       caption: sanitizeCaptionServer(caption || post.caption),
       scheduled_at: scheduledDate,
       status: 'SCHEDULED'
-    });
+    };
+    if (platforms) patch.platforms = platforms;
+    scheduler.updatePost(post.id, patch);
     
     // For videos, ensure we use tunnel URL if available
     if (tunnelUrl && post.filename.match(/\.(mp4|mov|avi|webm)$/i)) {
@@ -1412,6 +1418,62 @@ app.get('/ig/history', (req, res) => {
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), tunnel: { url: tunnelUrl, active: !!tunnelUrl } });
+});
+
+// ==============================
+// Facebook API endpoints (Pro)
+// ==============================
+app.get('/fb/pages', async (_req, res) => {
+  try {
+    if (!cfg.fbToken) {
+      return res.status(400).json({ error: 'missing_facebook_token' });
+    }
+    const r = await fetch(`https://graph.facebook.com/v18.0/me/accounts?access_token=${encodeURIComponent(cfg.fbToken)}`);
+    const data = await r.json();
+    if (!r.ok || (data && data.error)) {
+      const msg = (data && data.error && data.error.message) || `status_${r.status}`;
+      addLog('error', `[FACEBOOK] Failed to fetch pages: ${msg}`);
+      return res.status(500).json({ error: msg });
+    }
+    const pages = Array.isArray(data.data) ? data.data : [];
+    addLog('info', `[FACEBOOK] Fetched ${pages.length} pages`);
+    res.json({ pages });
+  } catch (e: any) {
+    addLog('error', `[FACEBOOK] Failed to fetch pages: ${e?.message || e}`);
+    res.status(500).json({ error: String(e?.message || e) });
+  }
+});
+
+app.post('/fb/publish', async (req, res) => {
+  try {
+    const { caption, filename, pageId, pageAccessToken } = req.body as { caption: string; filename: string; pageId: string; pageAccessToken?: string };
+    if (!cfg.fbToken && !pageAccessToken) return res.status(400).json({ error: 'missing_facebook_token' });
+    if (!pageId) return res.status(400).json({ error: 'missing_page_id' });
+    if (!filename) return res.status(400).json({ error: 'missing_filename' });
+
+    const token = pageAccessToken || cfg.fbToken;
+    const ext = String(path.extname(filename || '')).toLowerCase();
+    const isVideo = ['.mp4', '.mov', '.avi', '.webm'].includes(ext);
+    const localUrl = `http://localhost:${cfg.port}/media/${encodeURIComponent(filename)}`;
+    const mediaUrl = tunnelUrl ? `${tunnelUrl}/media/${encodeURIComponent(filename)}` : localUrl;
+
+    const endpoint = isVideo ? `https://graph.facebook.com/v18.0/${encodeURIComponent(pageId)}/videos` : `https://graph.facebook.com/v18.0/${encodeURIComponent(pageId)}/photos`;
+    const payload = isVideo ? { file_url: mediaUrl, description: caption || '', access_token: token } : { url: mediaUrl, message: caption || '', access_token: token };
+
+    const r = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const j = await r.json();
+    if (!r.ok || (j && j.error)) {
+      const msg = (j && j.error && j.error.message) || `status_${r.status}`;
+      addLog('error', `[FACEBOOK] Publish failed: ${msg}`);
+      return res.status(500).json({ error: msg });
+    }
+
+    addLog('info', `[FACEBOOK] Published ${filename} to page ${pageId}`, { id: j.id || j.post_id }, 'SUCCESS');
+    res.json({ success: true, postId: j.id || j.post_id });
+  } catch (e: any) {
+    addLog('error', `[FACEBOOK] Publish failed: ${e?.message || e}`);
+    res.status(500).json({ error: String(e?.message || e) });
+  }
 });
 
 function startServices() {
