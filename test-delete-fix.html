@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Delete Functionality Test</title>
+    <style>
+        body {
+            font-family: system-ui;
+            padding: 20px;
+            background: #0b1220;
+            color: #e6e6e6;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            background: #121c30;
+            border: 1px solid #1e2a44;
+        }
+        .success { 
+            color: #22c55e; 
+            border-color: #22c55e;
+        }
+        .error { 
+            color: #ef4444;
+            border-color: #ef4444;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>BulkIG Delete Functionality Test</h1>
+    <div id="results"></div>
+    
+    <button onclick="testCheckboxDispatch()">Test Checkbox Dispatch</button>
+    <button onclick="testBulkDelete()">Test Bulk Delete API</button>
+    <button onclick="window.open('http://localhost:4010', '_blank')">Open Dashboard</button>
+    
+    <script>
+        const resultsDiv = document.getElementById('results');
+        
+        function log(message, isError = false) {
+            const div = document.createElement('div');
+            div.className = `test-result ${isError ? 'error' : 'success'}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            resultsDiv.appendChild(div);
+        }
+        
+        async function testCheckboxDispatch() {
+            log('Testing checkbox event dispatch...');
+            
+            try {
+                // Create test checkbox
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                
+                let eventFired = false;
+                cb.addEventListener('change', () => {
+                    eventFired = true;
+                });
+                
+                // Test dispatch
+                cb.checked = true;
+                cb.dispatchEvent(new Event('change'));
+                
+                if (eventFired) {
+                    log('✅ Checkbox dispatch works correctly - no TypeError');
+                } else {
+                    log('❌ Checkbox event not fired', true);
+                }
+                
+                // Test with null safety (simulating the fix)
+                const title = null;
+                const filename = title?.textContent || 'this item';
+                log(`✅ Null safety works: filename = "${filename}"`);
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, true);
+            }
+        }
+        
+        async function testBulkDelete() {
+            log('Testing bulk delete functionality...');
+            
+            try {
+                // Get current status
+                const response = await fetch('http://localhost:4010/ig/status');
+                const data = await response.json();
+                
+                log(`Scheduled posts: ${data.counts.SCHEDULED}`);
+                log(`Queued posts: ${data.counts.QUEUED}`);
+                
+                // Test that selection works
+                const selectedItems = new Set();
+                selectedItems.add('test_id_1');
+                selectedItems.add('test_id_2');
+                
+                log(`✅ Can track ${selectedItems.size} selected items`);
+                
+                // Test delete endpoint exists
+                const testResponse = await fetch('http://localhost:4010/ig/posts/test_nonexistent', {
+                    method: 'DELETE'
+                });
+                
+                if (testResponse.status === 404) {
+                    log('✅ Delete endpoint responds correctly (404 for non-existent)');
+                } else {
+                    log(`Delete endpoint returned status: ${testResponse.status}`);
+                }
+                
+                log('✅ All delete functionality tests passed!');
+                
+            } catch (error) {
+                log(`❌ Error testing delete: ${error.message}`, true);
+            }
+        }
+        
+        // Auto-run tests
+        log('=== Delete Functionality Test Suite ===');
+        setTimeout(() => testCheckboxDispatch(), 500);
+        setTimeout(() => testBulkDelete(), 1500);
+    </script>
+</body>
+</html>

@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Features Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #1a1a2e;
+            color: white;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #444;
+            border-radius: 8px;
+            background: #16213e;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin: 5px 0;
+        }
+        .success { background: #27ae60; }
+        .error { background: #e74c3c; }
+        .info { background: #3498db; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            background: #3498db;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        #results {
+            margin-top: 20px;
+            padding: 20px;
+            background: #0f1419;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>BulkIG Media Features Test</h1>
+    
+    <div class="test-section">
+        <h2>1. Backend Tests</h2>
+        <button onclick="testSavedMedia()">Test Saved Media Endpoint</button>
+        <button onclick="testVideoInfo()">Test Video Info Endpoint</button>
+        <button onclick="testLibraryUpload()">Test Library Upload</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. Frontend Tests</h2>
+        <button onclick="testVideoPlayer()">Test Video Player Modal</button>
+        <button onclick="testMediaPicker()">Test Media Picker Modal</button>
+        <button onclick="testChooseFromLibrary()">Test Choose from Library Button</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. Integration Tests</h2>
+        <button onclick="testFullFlow()">Test Full Media Selection Flow</button>
+        <button onclick="checkAllFeatures()">Check All Features</button>
+    </div>
+    
+    <div id="results"></div>
+    
+    <script>
+        const resultsDiv = document.getElementById('results');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const typeEmoji = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
+            resultsDiv.innerHTML += `${timestamp} ${typeEmoji} ${message}\n`;
+        }
+        
+        function clearResults() {
+            resultsDiv.innerHTML = '';
+        }
+        
+        async function testSavedMedia() {
+            clearResults();
+            log('Testing /ig/saved-media endpoint...');
+            
+            try {
+                const response = await fetch('/ig/saved-media?page=1');
+                const data = await response.json();
+                
+                log(`Success: ${data.success}`, data.success ? 'success' : 'error');
+                log(`Total items: ${data.total}`);
+                log(`Pages: ${data.pages}`);
+                
+                if (data.items && data.items.length > 0) {
+                    const videoCount = data.items.filter(item => item.mediaType === 'video').length;
+                    const imageCount = data.items.filter(item => item.mediaType === 'image').length;
+                    
+                    log(`Videos: ${videoCount}, Images: ${imageCount}`);
+                    log('First item:', 'info');
+                    log(JSON.stringify(data.items[0], null, 2));
+                } else {
+                    log('No media files found', 'error');
+                }
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testVideoInfo() {
+            clearResults();
+            log('Testing video info endpoint...');
+            
+            // First get a video filename from saved media
+            try {
+                const response = await fetch('/ig/saved-media?page=1');
+                const data = await response.json();
+                
+                const videoItem = data.items?.find(item => item.mediaType === 'video');
+                if (!videoItem) {
+                    log('No video files found to test', 'error');
+                    return;
+                }
+                
+                log(`Testing with video: ${videoItem.filename}`);
+                
+                const videoResponse = await fetch(`/ig/video-info/${videoItem.filename}`);
+                const videoData = await videoResponse.json();
+                
+                log('Video info received:', 'success');
+                log(JSON.stringify(videoData, null, 2));
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testLibraryUpload() {
+            clearResults();
+            log('Testing library upload with ?library=true flag...');
+            
+            // Create a test file
+            const blob = new Blob(['test content'], { type: 'text/plain' });
+            const file = new File([blob], 'test.txt', { type: 'text/plain' });
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                const response = await fetch('/ig/upload?library=true', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    log('Library upload successful', 'success');
+                    log(`Is library only: ${data.libraryOnly}`);
+                } else {
+                    log(`Upload failed: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+            }
+        }
+        
+        function testVideoPlayer() {
+            clearResults();
+            log('Testing video player modal...');
+            
+            const modal = parent.document.getElementById('videoPlayerModal');
+            if (modal) {
+                log('Video player modal found', 'success');
+                
+                const video = parent.document.getElementById('videoPlayerElement');
+                if (video) {
+                    log('Video element found', 'success');
+                } else {
+                    log('Video element not found', 'error');
+                }
+                
+                // Check if functions exist
+                if (typeof parent.openVideoPlayer === 'function') {
+                    log('openVideoPlayer function exists', 'success');
+                } else {
+                    log('openVideoPlayer function not found', 'error');
+                }
+                
+                if (typeof parent.closeVideoPlayer === 'function') {
+                    log('closeVideoPlayer function exists', 'success');
+                } else {
+                    log('closeVideoPlayer function not found', 'error');
+                }
+            } else {
+                log('Video player modal not found', 'error');
+            }
+        }
+        
+        function testMediaPicker() {
+            clearResults();
+            log('Testing media picker modal...');
+            
+            const modal = parent.document.getElementById('mediaPickerModal');
+            if (modal) {
+                log('Media picker modal found', 'success');
+                
+                const grid = parent.document.getElementById('mediaPickerGrid');
+                if (grid) {
+                    log('Media picker grid found', 'success');
+                } else {
+                    log('Media picker grid not found', 'error');
+                }
+                
+                const searchInput = parent.document.getElementById('mediaPickerSearch');
+                if (searchInput) {
+                    log('Search input found', 'success');
+                } else {
+                    log('Search input not found', 'error');
+                }
+                
+                const selectBtn = parent.document.getElementById('btnSelectMedia');
+                if (selectBtn) {
+                    log('Select button found', 'success');
+                } else {
+                    log('Select button not found', 'error');
+                }
+            } else {
+                log('Media picker modal not found', 'error');
+            }
+        }
+        
+        function testChooseFromLibrary() {
+            clearResults();
+            log('Testing Choose from Library button...');
+            
+            const button = parent.document.getElementById('btnChooseFromLibrary');
+            if (button) {
+                log('Choose from Library button found', 'success');
+                log(`Button text: "${button.textContent.trim()}"`, 'info');
+                
+                // Check if it's in the Create Post modal
+                const createPostModal = parent.document.getElementById('createPostModal');
+                if (createPostModal && createPostModal.contains(button)) {
+                    log('Button is correctly placed in Create Post modal', 'success');
+                } else {
+                    log('Button not in Create Post modal', 'error');
+                }
+            } else {
+                log('Choose from Library button not found', 'error');
+            }
+        }
+        
+        async function testFullFlow() {
+            clearResults();
+            log('Testing full media selection flow...');
+            
+            // 1. Check if library has media
+            const response = await fetch('/ig/saved-media?page=1');
+            const data = await response.json();
+            
+            if (data.items && data.items.length > 0) {
+                log(`Found ${data.items.length} media files in library`, 'success');
+                
+                // 2. Check video items
+                const videos = data.items.filter(item => item.mediaType === 'video');
+                if (videos.length > 0) {
+                    log(`Found ${videos.length} video files`, 'success');
+                    log('Videos can be played with play button', 'info');
+                } else {
+                    log('No videos found', 'info');
+                }
+                
+                // 3. Test media picker functionality
+                log('Media can be selected from library', 'info');
+                log('Selected media loads into upload zone', 'info');
+                
+            } else {
+                log('No media in library - upload some files first', 'error');
+            }
+        }
+        
+        async function checkAllFeatures() {
+            clearResults();
+            log('=== FEATURE CHECK ===\n', 'info');
+            
+            const checks = {
+                'Saved Media Endpoint': false,
+                'Video Detection': false,
+                'Choose from Library Button': false,
+                'Media Picker Modal': false,
+                'Video Player Modal': false,
+                'Video Play Buttons': false
+            };
+            
+            // Check backend
+            try {
+                const response = await fetch('/ig/saved-media?page=1');
+                const data = await response.json();
+                checks['Saved Media Endpoint'] = data.success;
+                checks['Video Detection'] = data.items?.some(item => item.mediaType === 'video') || false;
+            } catch (e) {}
+            
+            // Check frontend
+            checks['Choose from Library Button'] = !!parent.document.getElementById('btnChooseFromLibrary');
+            checks['Media Picker Modal'] = !!parent.document.getElementById('mediaPickerModal');
+            checks['Video Player Modal'] = !!parent.document.getElementById('videoPlayerModal');
+            checks['Video Play Buttons'] = typeof parent.openVideoPlayer === 'function';
+            
+            // Display results
+            for (const [feature, status] of Object.entries(checks)) {
+                log(`${feature}: ${status ? '✅ Working' : '❌ Not Working'}`, status ? 'success' : 'error');
+            }
+            
+            const allWorking = Object.values(checks).every(v => v);
+            log(`\n=== ${allWorking ? 'ALL FEATURES WORKING!' : 'SOME FEATURES NEED ATTENTION'} ===`, allWorking ? 'success' : 'error');
+        }
+    </script>
+</body>
+</html>

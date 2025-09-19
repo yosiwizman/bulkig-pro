@@ -1,0 +1,907 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BulkIG Dashboard</title>
+  <link rel="icon" href="data:,">
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: #0b1220; color: #e6e6e6; }
+    .kw-cat { background:#121c30; border:1px solid #1e2a44; border-radius:8px; padding:8px; margin-bottom:8px; }
+    .kw-list { display:flex; flex-wrap:wrap; gap:6px; margin: 6px 0; }
+    .kw-chip { display:inline-block; padding:4px 8px; border-radius:12px; background:#0f172a; border:1px solid #1e2a44; cursor:pointer; }
+    .kw-chip.active { background:#1d4ed8; border-color:#2563eb; }
+
+    /* Timeline & Log styles */
+    .timeline { display:flex; gap:4px; padding:8px 4px; align-items:center; border:1px solid #1e2a44; background:#0f172a; border-radius:6px; overflow-x:auto; margin-bottom:8px; }
+    .dotlog { width:8px; height:8px; border-radius:50%; display:inline-block; }
+    .dotlog.ERROR { background:#ef4444; }
+    .dotlog.SUCCESS { background:#22c55e; }
+    .dotlog.WARNING { background:#f59e0b; }
+    .dotlog.INFO { background:#38bdf8; }
+
+    .loglist { border:1px solid #1e2a44; background:#0f172a; border-radius:6px; padding:8px; max-height:260px; overflow:auto; }
+    .logrow { padding:6px 4px; border-bottom:1px dashed #1e2a44; }
+    .logrow:last-child { border-bottom:none; }
+    .badge { display:inline-block; padding:2px 6px; border-radius:4px; font-size:11px; margin-right:6px; }
+    .badge.ERROR { background:#ef4444; color:#fff; }
+    .badge.SUCCESS { background:#16a34a; color:#fff; }
+    .badge.WARNING { background:#f59e0b; color:#111; }
+    .badge.INFO { background:#38bdf8; color:#111; }
+
+    .logstats { display:grid; grid-template-columns: repeat(4, minmax(140px, 1fr)); gap:8px; margin:8px 0; }
+    .statcard { background:#121c30; border:1px solid #1e2a44; border-radius:8px; padding:8px; }
+    .statlabel { color:#a0aec0; font-size:12px; }
+    .statvalue { font-size:18px; font-weight:700; }
+
+    /* Days checkboxes */
+    #scDays { display:flex; gap:8px; flex-wrap:wrap; }
+    .daybox { display:flex; align-items:center; gap:6px; padding:4px 8px; border:1px solid #1e2a44; border-radius:6px; background:#0f172a; }
+
+    /* Health cards */
+    .health-cards { display:grid; grid-template-columns: repeat(2, minmax(220px, 1fr)); gap:8px; }
+    .health-card { background:#121c30; border:1px solid #1e2a44; border-radius:8px; padding:8px; }
+    .hlabel { color:#a0aec0; font-size:12px; }
+    .hvalue { font-size:18px; font-weight:700; }
+    .alert-list { display:flex; flex-direction:column; gap:6px; }
+    .alert { padding:8px; border-radius:6px; border:1px solid #334155; }
+    .alert.CRITICAL { background:#1f2937; border-color:#ef4444; }
+    .alert.WARNING { background:#1f2937; border-color:#f59e0b; }
+
+    header { background: #111a2b; padding: 16px 24px; display:flex; align-items:center; justify-content:space-between; }
+    h1 { margin: 0; font-size: 20px; }
+    .container { padding: 16px 24px; }
+    .cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+    .card { background: #121c30; border: 1px solid #1e2a44; border-radius: 8px; padding: 12px; }
+    .big { font-size: 28px; font-weight: 700; }
+    .muted { color: #a0aec0; font-size: 12px; }
+    .row { display:flex; gap: 8px; align-items:center; }
+    button { background: #2563eb; color: #fff; border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer; }
+    button.secondary { background: #334155; }
+    button:disabled { opacity: .7; cursor: not-allowed; }
+    .grid { display:grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-top: 16px; }
+    .list { background:#121c30; border: 1px solid #1e2a44; border-radius:8px; padding:12px; }
+    .item { display:flex; align-items:center; gap: 12px; padding: 8px 0; border-bottom: 1px dashed #1e2a44; }
+    .item:last-child { border-bottom: none; }
+    .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
+    .dot.QUEUED { background:#94a3b8; }
+    .dot.SCHEDULED { background:#38bdf8; }
+    .dot.PUBLISHING { background:#f59e0b; }
+    .dot.PUBLISHED { background:#22c55e; }
+    .dot.ERROR { background:#ef4444; }
+    img.thumb { width:80px; height:80px; object-fit:cover; border-radius:6px; border:1px solid #1f2937; background:#0f172a; }
+    .toolbar { display:flex; gap:8px; }
+    .dropzone { border:2px dashed #334155; padding:16px; text-align:center; border-radius:8px; background:#0f172a; color:#94a3b8; }
+    .log { max-height: 260px; overflow:auto; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size:12px; line-height:1.4; background:#0f172a; border-radius:6px; padding:8px; border:1px solid #1e2a44; }
+    #toasts { position: fixed; top: 12px; right: 12px; display:flex; flex-direction:column; gap:8px; z-index: 9999; }
+    .toast { padding:8px 12px; border-radius:6px; color:#fff; box-shadow:0 4px 10px rgba(0,0,0,.3); }
+    .toast.success { background:#16a34a; }
+    .toast.error { background:#dc2626; }
+    a { color:#93c5fd; }
+
+    /* Layout constraints */
+    .left-panel { max-height: calc(100vh - 200px); overflow-y: auto; overflow-x: hidden; }
+    #upcoming { max-height: 400px; overflow-y: auto; overflow-x: hidden; }
+
+    /* Viewport and tab content scrolling */
+    body { margin: 0; overflow: hidden; height: 100vh; }
+    .tab-content, [role="tabpanel"] { height: calc(100vh - 250px); overflow-y: auto; overflow-x: hidden; }
+
+    /* Calendar styles */
+    .cal-grid { display:grid; grid-template-columns: repeat(7, 1fr); gap:8px; }
+    .cal-day { background:#0f172a; border:1px solid #1e2a44; border-radius:6px; padding:8px; cursor:pointer; min-height:72px; display:flex; flex-direction:column; justify-content:space-between; }
+    .cal-day:hover { border-color:#2563eb; }
+    .cal-day .cal-date { font-size:12px; color:#a0aec0; display:flex; justify-content:space-between; align-items:center; }
+    .cal-day .cal-badges { display:flex; gap:4px; flex-wrap:wrap; }
+    .cal-badge { background:#334155; color:#e6e6e6; border-radius:10px; padding:2px 6px; font-size:11px; }
+    .cal-today { outline: 1px solid #2563eb; }
+    .modal { position:fixed; inset:0; background:rgba(0,0,0,0.6); display:none; align-items:center; justify-content:center; z-index:9998; }
+    .modal-content { background:#121c30; border:1px solid #1e2a44; border-radius:8px; padding:12px; max-width:420px; width:90%; color:#e6e6e6; }
+    .modal-content h4 { margin:0 0 8px 0; font-size:16px; }
+    .modal-content .times { max-height:240px; overflow:auto; }
+
+    @media (max-width: 980px) {
+      .cal-grid { grid-template-columns: repeat(7, minmax(40px, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>BulkIG Dashboard</h1>
+    <div class="toolbar">
+      <button id="btnAutorun">Autorun: ...</button>
+      <button id="btnPlan" class="secondary">Force Plan</button>
+      <button id="btnRefresh" class="secondary">Refresh</button>
+      <label class="row"><input id="chkAuto" type="checkbox" checked style="transform: scale(1.2); margin-right:6px;"> Auto-refresh</label>
+    </div>
+  </header>
+  <div id="toasts"></div>
+  <div class="container">
+    <div class="cards">
+      <div class="card"><div class="muted">Autorun</div><div class="big" id="valAutorun">...</div></div>
+      <div class="card"><div class="muted">Queued</div><div class="big" id="valQueued">0</div></div>
+      <div class="card"><div class="muted">Scheduled</div><div class="big" id="valScheduled">0</div></div>
+      <div class="card"><div class="muted">Publishing</div><div class="big" id="valPublishing">0</div></div>
+      <div class="card"><div class="muted">Published</div><div class="big" id="valPublished">0</div></div>
+    </div>
+    <div class="muted" style="margin-top:6px">Last plan run: <span id="valLastPlan">-</span></div>
+
+    <div class="grid">
+      <div class="list left-panel">
+        <div class="row" style="justify-content:space-between; margin-bottom:8px;">
+          <div class="muted">Scheduled posts</div>
+          <div class="muted"><a href="/media/" target="_blank">Open Inbox listing</a></div>
+        </div>
+        <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <div class="muted" id="upcCounter">Showing 0-0 of 0 items</div>
+          <div class="row">
+            <button id="btnUpcPrev" class="secondary">Prev</button>
+            <button id="btnUpcNext" class="secondary">Next</button>
+          </div>
+        </div>
+        <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <label class="row" style="gap:6px;"><input id="chkUpcSelectAll" type="checkbox"> Select All</label>
+          <div class="row" style="gap:8px; align-items:center;">
+            <span class="muted" id="upcSelectedInfo">0 of 0 selected</span>
+            <button id="btnUpcRemoveSel" class="secondary" disabled>Remove Selected</button>
+          </div>
+        </div>
+        <div id="upcoming"></div>
+      </div>
+      <div class="tab-content">
+        <div style="display:flex; gap:8px; margin-bottom:8px;">
+          <button id="tabSchedule" class="secondary">⏰ Custom Scheduling</button>
+          <button id="tabKeywords" class="secondary">🏷️ Keywords</button>
+          <button id="tabHistory" class="secondary">📜 History</button>
+          <button id="tabHealth" class="secondary">🩺 Health</button>
+        </div>
+        <div class="panel" id="schedPanel">
+          <h3>⏰ Custom Scheduling</h3>
+          <div class="controls">
+            <div class="row">
+              <label class="muted">Mode</label>
+              <select id="scMode">
+                <option value="times">Specific Times</option>
+                <option value="interval">Every N hours</option>
+              </select>
+            </div>
+            <div id="scTimesWrap">
+              <div class="muted" style="margin-bottom:4px">Posting Times</div>
+              <div id="scTimes" class="time-slots"></div>
+              <button id="btnAddTime" class="secondary">+ Add Time</button>
+            </div>
+            <div id="scIntervalWrap" style="display:none">
+              <label class="muted">Interval hours</label>
+              <input id="scInterval" type="number" min="1" step="1" value="4" style="width:90px" />
+            </div>
+            <div>
+              <div class="muted" style="margin-bottom:4px">Days to post</div>
+              <div id="scDays" class="days"></div>
+            </div>
+            <div class="row" style="gap:12px; align-items:center;">
+              <label class="row"><input id="scAutoRepost" type="checkbox" style="transform: scale(1.2); margin-right:6px;"> Auto-Repost (after 60 days, max 3)</label>
+            </div>
+            <div class="row">
+              <button id="btnSaveSchedule">Save</button>
+              <button id="btnPlanNow" class="secondary">Plan Now</button>
+            </div>
+            <div class="calendar" id="calWrap" style="max-height:400px;">
+              <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <div class="row" style="gap:6px;">
+                  <button id="btnCalPrev" class="secondary">◀ Prev Week</button>
+                  <button id="btnCalToday" class="secondary">Today</button>
+                  <button id="btnCalNext" class="secondary">Next Week ▶</button>
+                </div>
+                <div id="calMonth" class="muted">Month YYYY</div>
+              </div>
+              <div id="calGrid" class="cal-grid"></div>
+              <div class="muted" style="margin-top:6px">Click a day to view scheduled times</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" id="kwPanel" style="display:none;">
+          <h3>🏷️ Keywords & Caption Generator</h3>
+          <div id="kwCategories"></div>
+          <div style="margin-top:12px;">
+            <div class="muted" style="margin-bottom:4px;">Caption Preview</div>
+            <div class="row" style="gap:12px; flex-wrap:wrap;">
+              <input id="cpFilename" type="text" placeholder="example.mp4 or image.jpg" style="min-width:220px;" />
+              <select id="cpMediaType">
+                <option value="image">Image</option>
+                <option value="video">Video</option>
+              </select>
+              <button id="btnGenerate" class="secondary">Generate</button>
+            </div>
+            <div class="muted" style="margin-top:8px">Select keywords from categories below; they will be used in the caption.</div>
+            <textarea id="cpOutput" rows="5" style="width:100%; margin-top:8px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;"></textarea>
+          </div>
+        </div>
+
+        <div class="dropzone" id="dropzone">Drag & Drop images here (png, jpg, jpeg, webp, gif, mp4, mov, avi) or click to select</div>
+        <input type="file" id="fileInput" accept="image/*,video/*" multiple style="display:none" />
+
+        <div class="panel" id="histPanel" style="display:none; margin-top:16px;">
+          <h3>📜 History</h3>
+          <div id="histList"></div>
+          <div class="row" style="gap:8px; margin-top:8px;">
+            <button id="btnHistPrev" class="secondary">Prev</button>
+            <span class="muted" id="histPage">Page 1</span>
+            <button id="btnHistNext" class="secondary">Next</button>
+          </div>
+        </div>
+
+        <div class="panel" id="healthPanel" style="display:none; margin-top:16px;">
+          <h3>🩺 System Health</h3>
+          <div class="row" style="gap:8px; align-items:center; margin-bottom:8px;">
+            <button id="btnEnableAlerts" class="secondary">Enable Alerts</button>
+            <label class="row"><input id="chkProbeIG" type="checkbox" style="transform: scale(1.2); margin-right:6px;"> Probe IG Connectivity</label>
+          </div>
+          <div id="healthCards" class="health-cards"></div>
+          <div class="list" style="margin-top:8px;">
+            <div class="muted" style="margin-bottom:6px;">Alerts</div>
+            <div id="healthAlerts" class="alert-list"></div>
+          </div>
+        </div>
+
+        <div class="logwrap" style="margin-top:16px;">
+          <div class="loghead">
+            <div class="muted">Activity Log</div>
+            <div class="logtools">
+              <input id="logSearch" type="text" placeholder="Search logs" style="padding:6px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;">
+              <button id="btnToggleLog" class="secondary">Show All</button>
+              <button id="btnCopyLog" class="secondary">📋 Copy</button>
+              <button id="btnDownloadLog" class="secondary">⬇️ JSON</button>
+              <button id="btnClearLog" class="secondary">🗑️ Clear</button>
+              <select id="logFilter">
+                <option value="all">All Events</option>
+                <option value="success">Successes Only</option>
+                <option value="error">Errors Only</option>
+                <option value="warning">Warnings Only</option>
+                <option value="info">Info Only</option>
+              </select>
+            </div>
+          </div>
+          <div id="logStats" class="logstats"></div>
+          <div id="timeline" class="timeline"></div>
+          <div id="log" class="loglist"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const els = {
+      autorunBtn: document.getElementById('btnAutorun'),
+      planBtn: document.getElementById('btnPlan'),
+      refreshBtn: document.getElementById('btnRefresh'),
+      autorunVal: document.getElementById('valAutorun'),
+      queued: document.getElementById('valQueued'),
+      scheduled: document.getElementById('valScheduled'),
+      publishing: document.getElementById('valPublishing'),
+      published: document.getElementById('valPublished'),
+      lastPlan: document.getElementById('valLastPlan'),
+      upcoming: document.getElementById('upcoming'),
+      log: document.getElementById('log'),
+      toasts: document.getElementById('toasts'),
+      chkAuto: document.getElementById('chkAuto'),
+      dropzone: document.getElementById('dropzone'),
+      fileInput: document.getElementById('fileInput'),
+      // Scheduler + Log UI elements
+      scMode: document.getElementById('scMode'),
+      scTimesWrap: document.getElementById('scTimesWrap'),
+      scTimes: document.getElementById('scTimes'),
+      scIntervalWrap: document.getElementById('scIntervalWrap'),
+      scInterval: document.getElementById('scInterval'),
+      scDays: document.getElementById('scDays'),
+      btnAddTime: document.getElementById('btnAddTime'),
+      btnSaveSchedule: document.getElementById('btnSaveSchedule'),
+      btnPlanNow: document.getElementById('btnPlanNow'),
+      scPreview: document.getElementById('scPreview'),
+      btnCopyLog: document.getElementById('btnCopyLog'),
+      btnClearLog: document.getElementById('btnClearLog'),
+      logFilter: document.getElementById('logFilter'),
+      timeline: document.getElementById('timeline'),
+      scPreviewCount: document.getElementById('scPreviewCount'),
+      // Upcoming pagination
+      btnUpcPrev: document.getElementById('btnUpcPrev'),
+      btnUpcNext: document.getElementById('btnUpcNext'),
+      upcCounter: document.getElementById('upcCounter'),
+      // Log toggle
+      btnToggleLog: document.getElementById('btnToggleLog'),
+      // Keywords UI
+      tabSchedule: document.getElementById('tabSchedule'),
+      tabKeywords: document.getElementById('tabKeywords'),
+      kwPanel: document.getElementById('kwPanel'),
+      kwCategories: document.getElementById('kwCategories'),
+      cpFilename: document.getElementById('cpFilename'),
+      cpMediaType: document.getElementById('cpMediaType'),
+      btnGenerate: document.getElementById('btnGenerate'),
+      cpOutput: document.getElementById('cpOutput'),
+      // History UI
+      tabHistory: document.getElementById('tabHistory'),
+      histPanel: document.getElementById('histPanel'),
+      histList: document.getElementById('histList'),
+      btnHistPrev: document.getElementById('btnHistPrev'),
+      btnHistNext: document.getElementById('btnHistNext'),
+      histPage: document.getElementById('histPage'),
+      scAutoRepost: document.getElementById('scAutoRepost'),
+      // Health UI
+      tabHealth: document.getElementById('tabHealth'),
+      healthPanel: document.getElementById('healthPanel'),
+      healthCards: document.getElementById('healthCards'),
+      healthAlerts: document.getElementById('healthAlerts'),
+      btnEnableAlerts: document.getElementById('btnEnableAlerts'),
+      chkProbeIG: document.getElementById('chkProbeIG'),
+    };
+
+    function safeVal(el, def='') { try { return (el && typeof el.value !== 'undefined') ? el.value : def; } catch (e) { return def; } }
+
+    async function fetchJSON(url, opts) {
+      const r = await fetch(url, opts);
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    }
+
+    function fmtTime(s) { try { return new Date(s).toLocaleString(); } catch { return s; } }
+
+    async function loadStatus() {
+      const s = await fetchJSON('/ig/status?t=' + Date.now(), { cache: 'no-store' });
+      els.autorunVal.textContent = s.autorun ? 'ON' : 'OFF';
+      els.autorunBtn.textContent = 'Autorun: ' + (s.autorun ? 'ON' : 'OFF');
+      els.queued.textContent = s.counts.QUEUED;
+      els.scheduled.textContent = s.counts.SCHEDULED;
+      els.publishing.textContent = s.counts.PUBLISHING;
+      els.published.textContent = s.counts.PUBLISHED;
+      els.lastPlan.textContent = s.lastPlanRun ? fmtTime(s.lastPlanRun) : '-';
+
+      // update upcoming pagination source
+      upcAll = (s.next || []);
+      if (!upcAll || !upcAll.length) { upcPage = 1; }
+      renderUpcoming();
+    }
+
+    let lastLogTs = '';
+    let logsCache = [];
+      // Upcoming list pagination state
+    let upcAll = [];
+    let upcPage = 1;
+    let upcPageSize = 10;
+    let upcSelected = new Set();
+    function updateUpcSelectedInfo(total){
+      var info = document.getElementById('upcSelectedInfo'); if (info) info.textContent = (upcSelected ? upcSelected.size : 0) + ' of ' + (total||0) + ' selected';
+      var btn = document.getElementById('btnUpcRemoveSel'); if (btn) btn.disabled = !(upcSelected && upcSelected.size>0);
+      var selAll = document.getElementById('chkUpcSelectAll'); if (selAll && total){ var grid = document.getElementById('upcoming'); var pageBoxes = grid ? grid.querySelectorAll('input[type=\"checkbox\"].upc-sel') : []; var allChecked = true; pageBoxes.forEach(function(b){ if(!b.checked) allChecked = false; }); selAll.checked = allChecked; }
+    }
+    function renderUpcoming(){
+      const total = (upcAll && upcAll.length) ? upcAll.length : 0;
+      const pages = total ? Math.ceil(total / upcPageSize) : 1;
+      if (upcPage < 1) upcPage = 1; if (upcPage > pages) upcPage = pages;
+      const startIdx = (upcPage-1) * upcPageSize;
+      const endIdx = Math.min(total, startIdx + upcPageSize);
+      if (els.upcCounter) els.upcCounter.textContent = 'Showing ' + (total? (startIdx+1) : 0) + '-' + endIdx + ' of ' + total + ' items';
+      if (els.btnUpcPrev) els.btnUpcPrev.disabled = (upcPage<=1);
+      if (els.btnUpcNext) els.btnUpcNext.disabled = (upcPage>=pages);
+      // render slice
+      els.upcoming.innerHTML = '';
+      (upcAll || []).slice(startIdx, endIdx).forEach(function(item){
+        const row = document.createElement('div');
+        row.className = 'item';
+        const cb = document.createElement('input'); cb.type='checkbox'; cb.className='upc-sel'; cb.style.marginRight='8px';
+        var key = item.id ? String(item.id) : ('fn:'+item.filename);
+        cb.checked = upcSelected.has(key);
+        cb.onchange = function(){ if (cb.checked) upcSelected.add(key); else upcSelected.delete(key); updateUpcSelectedInfo(total); };
+        const img = document.createElement('img'); img.className = 'thumb';
+        img.src = '/media/' + encodeURIComponent(item.filename) + '?t=' + Date.now();
+        img.onerror = function(){ try { this.style.display='none'; console.warn('Image 404:', this.src); } catch(e){} };
+        const info = document.createElement('div');
+        info.innerHTML = '<div><strong>' + item.filename + '</strong></div><div class="muted">' + fmtTime(item.scheduled_at) + ' · <span class="dot ' + item.status + '"></span> ' + item.status + '</div>';
+        const btn = document.createElement('button'); btn.textContent = '📤 Post Now'; btn.className='secondary'; btn.onclick = async function(){
+          try { await fetchJSON('/ig/post-now', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ filename: item.filename }) }); await loadStatus(); await loadLogs(); showToast('success', 'Queued for immediate publish: ' + item.filename); } catch(e){ showToast('error', 'Post Now failed: ' + e.message); }
+        };
+        const rbtn = document.createElement('button'); rbtn.textContent = '🗑️ Remove'; rbtn.className='secondary'; rbtn.onclick = async function(){
+          try {
+            if (!confirm('Delete '+item.filename+'? This cannot be undone.')) return;
+            if (!item.id) { showToast('error','Missing post id'); return; }
+            await fetchJSON('/ig/posts/'+encodeURIComponent(item.id), { method:'DELETE' });
+            await loadStatus(); await loadLogs(); showToast('success','Removed: '+item.filename);
+          } catch(e){ showToast('error','Remove failed: '+ e.message); }
+        };
+        row.appendChild(cb); row.appendChild(img); row.appendChild(info); row.appendChild(btn); row.appendChild(rbtn);
+        els.upcoming.appendChild(row);
+      });
+      updateUpcSelectedInfo(total);
+    }
+
+    function renderTimeline(list) {
+      const el = document.getElementById('timeline'); if (!el) return; el.innerHTML='';
+      const recent = list.slice(-200);
+      recent.forEach(l => {
+        const cat = l.category || (l.level==='error'?'ERROR':l.level==='warn'?'WARNING':'INFO');
+        const d = document.createElement('span'); d.className = 'dotlog ' + cat;
+        d.title = `${fmtTime(l.ts)} ${cat}`;
+        el.appendChild(d);
+      });
+    }
+
+    let logShowAll = false;
+    function renderLogs() {
+      const filter = els.logFilter ? els.logFilter.value : 'all';
+      const q = (els.logSearch && els.logSearch.value || '').toLowerCase();
+      let list = logsCache;
+      // Filter by category
+      if (filter === 'success') list = list.filter(l => (l.category||'').toUpperCase()==='SUCCESS');
+      if (filter === 'error') list = list.filter(l => (l.category||'').toUpperCase()==='ERROR');
+      if (filter === 'warning') list = list.filter(l => (l.category||'').toUpperCase()==='WARNING');
+      if (filter === 'info') list = list.filter(l => (l.category||'').toUpperCase()==='INFO');
+      // Search
+      if (q) list = list.filter(l => (l.message||'').toLowerCase().includes(q) || JSON.stringify(l.data||{}).toLowerCase().includes(q));
+
+      // Grouping: Today, Yesterday, This Week, Older
+      let groups = { Today: [], Yesterday: [], 'This Week': [], Older: [] };
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const startOfYesterday = new Date(startOfToday.getTime() - 24*3600*1000);
+      const startOfWeek = new Date(startOfToday.getTime() - (startOfToday.getDay())*24*3600*1000);
+
+      list.forEach(l => {
+        const dt = new Date(l.ts);
+        if (dt >= startOfToday) groups.Today.push(l);
+        else if (dt >= startOfYesterday) groups.Yesterday.push(l);
+        else if (dt >= startOfWeek) groups['This Week'].push(l);
+        else groups.Older.push(l);
+      });
+
+      // Collapse to last 5 if not expanded
+      var ordered = [].concat(groups.Today, groups.Yesterday, groups['This Week'], groups.Older);
+      if (!logShowAll) {
+        // keep only last 5
+        var last5 = ordered.slice(-5);
+        groups = { All: last5 };
+      }
+
+      els.log.innerHTML = '';
+      Object.keys(groups).forEach(label => {
+        const arr = groups[label]; if (!arr.length) return;
+        const h = document.createElement('div'); h.className='muted'; h.style.margin='6px 0'; h.textContent = label;
+        els.log.appendChild(h);
+        arr.forEach(l => {
+          const row = document.createElement('div'); row.className = 'logrow';
+          const cat = (l.category||'INFO').toUpperCase();
+          const head = document.createElement('div');
+          head.innerHTML = `<span class=\"badge ${cat}\">${cat}</span> [${fmtTime(l.ts)}] ${l.message}`;
+          const details = document.createElement('pre'); details.style.display = 'none'; details.textContent = l.data ? JSON.stringify(l.data, null, 2) : '';
+          row.appendChild(head); row.appendChild(details);
+          row.onclick = () => { details.style.display = (details.style.display === 'none' ? 'block' : 'none'); };
+          els.log.appendChild(row);
+        });
+      });
+      els.log.scrollTop = els.log.scrollHeight;
+      renderTimeline(list);
+      renderStats(list);
+    }
+
+    async function loadLogs() {
+      const logs = await fetchJSON('/ig/logs?limit=500&t=' + Date.now(), { cache: 'no-store' });
+      const newest = logs[logs.length - 1]?.ts || '';
+      const recent = lastLogTs ? logs.filter(l => l.ts > lastLogTs) : logs;
+      recent.forEach(l => {
+        const cat = (l.category||'').toUpperCase();
+        if (cat === 'SUCCESS') showToast('success', l.message);
+        if (cat === 'ERROR') showToast('error', l.message);
+      });
+      lastLogTs = newest;
+      logsCache = logs;
+      renderLogs();
+    }
+
+    els.autorunBtn.addEventListener('click', async () => {
+      try {
+        els.autorunBtn.disabled = true;
+        const s = await fetchJSON('/ig/status');
+        const next = !s.autorun;
+        await fetchJSON('/ig/autorun', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ enabled: next }) });
+        await loadStatus(); await loadLogs();
+      } catch (e) { alert('Failed: ' + e.message); } finally { els.autorunBtn.disabled = false; }
+    });
+
+    els.planBtn.addEventListener('click', async () => {
+      try {
+        els.planBtn.disabled = true;
+        await fetchJSON('/ig/plan', { method:'POST' });
+        await loadStatus(); await loadLogs();
+      } catch (e) { alert('Failed: ' + e.message); } finally { els.planBtn.disabled = false; }
+    });
+
+    els.refreshBtn.addEventListener('click', async () => { try { await loadStatus(); await loadLogs(); showToast('success','Refreshed'); } catch(e){ showToast('error','Refresh failed: ' + e.message); } });
+
+    // Log tools
+    document.getElementById('btnCopyLog').addEventListener('click', async () => {
+      const text = (logsCache || []).map(l => `[${fmtTime(l.ts)}] [${(l.category||l.level).toString().toUpperCase()}] ${l.message}${l.data? ' '+JSON.stringify(l.data):''}`).join('\n');
+      try { await navigator.clipboard.writeText(text); showToast('success','Log copied'); } catch(e){ showToast('error','Copy failed'); }
+    });
+    document.getElementById('btnDownloadLog').addEventListener('click', async () => {
+      try {
+        const r = await fetch('/ig/logs/export');
+        const blob = await r.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'activity.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+        showToast('success','Downloaded');
+      } catch (e){ showToast('error','Download failed'); }
+    });
+    document.getElementById('btnClearLog').addEventListener('click', async () => {
+      try { await fetchJSON('/ig/logs/clear', { method:'POST' }); logsCache = []; renderLogs(); showToast('success','Log cleared'); } catch(e){ showToast('error','Clear failed: ' + e.message); }
+    });
+    document.getElementById('logFilter').addEventListener('change', () => renderLogs());
+    document.getElementById('logSearch').addEventListener('input', () => renderLogs());
+    if (els.btnToggleLog) els.btnToggleLog.addEventListener('click', function(){ logShowAll = !logShowAll; els.btnToggleLog.textContent = logShowAll ? 'Show 5' : 'Show All'; renderLogs(); });
+
+    let timer = setInterval(async () => { if (els.chkAuto.checked) { await loadStatus(); await loadLogs(); await loadHealth(); } }, 3000);
+
+    // Scheduler UI
+    function setModeUI(mode){
+      if (els.scMode) els.scMode.value = mode;
+      document.getElementById('scTimesWrap').style.display = (mode === 'times') ? 'block' : 'none';
+      document.getElementById('scIntervalWrap').style.display = (mode === 'interval') ? 'block' : 'none';
+    }
+
+    function addTimeSlot(value){
+      const row = document.createElement('div'); row.className = 'time-row';
+      const input = document.createElement('input'); input.type='time'; input.value = value || '09:00';
+      const del = document.createElement('button'); del.className='secondary'; del.textContent='×'; del.onclick = ()=> row.remove();
+      row.appendChild(input); row.appendChild(del); document.getElementById('scTimes').appendChild(row);
+    }
+
+    function renderTimeSlots(times){
+      document.getElementById('scTimes').innerHTML = '';
+      (times && times.length ? times : []).forEach((t)=> addTimeSlot(t));
+      if (!times || !times.length) addTimeSlot('09:00');
+    }
+
+    function renderDays(days){
+      var cont = document.getElementById('scDays'); if (!cont) return; cont.innerHTML = '';
+      var labels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      var ids = ['sun','mon','tue','wed','thu','fri','sat'];
+      for (var i=0;i<7;i++){
+        var lab = document.createElement('label'); lab.className = 'daybox';
+        var cb = document.createElement('input'); cb.type = 'checkbox'; cb.id = 'day-' + ids[i]; cb.dataset.idx = String(i);
+        // default all checked if days not provided; otherwise check if present
+        cb.checked = !days || days.indexOf(i) >= 0;
+        var txt = document.createElement('span'); txt.textContent = labels[i];
+        lab.appendChild(cb); lab.appendChild(txt);
+        cont.appendChild(lab);
+      }
+    }
+
+    function collectConfig(){
+      const mode = els.scMode ? els.scMode.value : 'times';
+      var daysNodes = (document.getElementById('scDays')||document.body).querySelectorAll('input[type="checkbox"][data-idx]');
+      const days = Array.from(daysNodes).filter(function(el){ return !!el.checked; }).map(function(el){ return Number(el.dataset.idx); });
+      const times = Array.from((document.getElementById('scTimes')||document.body).querySelectorAll('input[type=\"time\"]')).map(function(i){ return i.value; }).filter(Boolean);
+      const intEl = document.getElementById('scInterval');
+      const intervalHours = Number((intEl && intEl.value) ? intEl.value : 4);
+      const autoRepostEnabled = !!(els.scAutoRepost && els.scAutoRepost.checked);
+      return { mode, days, times, intervalHours, autoRepostEnabled };
+    }
+
+    async function loadSchedule(){
+      const cfg = await fetchJSON('/ig/schedule-config');
+      setModeUI((cfg && cfg.mode) ? cfg.mode : 'times');
+      var intEl2 = document.getElementById('scInterval'); if (intEl2) intEl2.value = String((cfg && cfg.intervalHours) ? cfg.intervalHours : 4);
+      renderTimeSlots(cfg.times||[]);
+      renderDays(cfg.days||[0,1,2,3,4,5,6]);
+      if (els.scAutoRepost) els.scAutoRepost.checked = !!(cfg && cfg.autoRepostEnabled);
+      await loadCalendar();
+    }
+
+    async function saveSchedule(){
+      const payload = collectConfig();
+      await fetchJSON('/ig/schedule-config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      showToast('success','Schedule saved');
+      await loadCalendar();
+    }
+
+    // Calendar preview (week view)
+    let calWeekStart = null; // Date at start of week (Sunday)
+    let calTimes = [];
+
+    function startOfWeek(d){ var x=new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setHours(0,0,0,0); var day=x.getDay(); x.setDate(x.getDate()-day); return x; }
+    function sameDay(a,b){ return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+
+    async function loadCalendar(){
+      var data = await fetchJSON('/ig/schedule-preview?count=60&t='+Date.now(), { cache:'no-store' });
+      calTimes = (data||[]).map(function(s){ return new Date(s); });
+      if (!calWeekStart) calWeekStart = startOfWeek(new Date());
+      renderCalendar();
+    }
+
+    function renderCalendar(){
+      var grid = document.getElementById('calGrid'); if (!grid) return;
+      var monthLbl = document.getElementById('calMonth');
+      var days = [];
+      for (var i=0;i<7;i++){ var d=new Date(calWeekStart.getTime()); d.setDate(d.getDate()+i); days.push(d); }
+      var mid = days[3]; if (monthLbl) monthLbl.textContent = mid.toLocaleString(undefined, { month:'long', year:'numeric' });
+
+      grid.innerHTML = '';
+      var today = new Date(); today.setHours(0,0,0,0);
+      days.forEach(function(d){
+        var cell = document.createElement('div'); cell.className = 'cal-day'; if (sameDay(d,today)) cell.classList.add('cal-today');
+        var top = document.createElement('div'); top.className='cal-date';
+        var dayName = d.toLocaleDateString(undefined,{ weekday:'short'});
+        var dateNum = d.getDate();
+        top.innerHTML = '<span>'+dayName+'</span><span>'+dateNum+'</span>';
+        var badges = document.createElement('div'); badges.className='cal-badges';
+        var events = calTimes.filter(function(t){ return sameDay(t,d); }).sort(function(a,b){ return a.getTime()-b.getTime(); });
+        var count = events.length;
+        if (count>0){ var b=document.createElement('span'); b.className='cal-badge'; b.textContent = String(count)+' post'+(count>1?'s':''); badges.appendChild(b); }
+        cell.appendChild(top); cell.appendChild(badges);
+        cell.onclick = function(){ openDayPopup(d, events); };
+        grid.appendChild(cell);
+      });
+    }
+
+    function openDayPopup(day, events){
+      var modal = document.getElementById('calModal');
+      if (!modal){
+        modal = document.createElement('div'); modal.id='calModal'; modal.className='modal';
+        modal.innerHTML = '<div class="modal-content"><h4 id="calModalTitle"></h4><div id="calModalTimes" class="times"></div><div class="row" style="justify-content:flex-end; margin-top:8px;"><button id="btnCalClose" class="secondary">Close</button></div></div>';
+        document.body.appendChild(modal);
+        modal.addEventListener('click', function(e){ if (e.target===modal) modal.style.display='none'; });
+      }
+      var title = document.getElementById('calModalTitle');
+      var times = document.getElementById('calModalTimes');
+      if (title) title.textContent = day.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+      if (times) times.innerHTML = (events && events.length) ? events.map(function(t){ return '<div>'+t.toLocaleTimeString()+'</div>'; }).join('') : '<div class="muted">No scheduled times</div>';
+      var closeBtn = document.getElementById('btnCalClose'); if (closeBtn) closeBtn.onclick = function(){ var m=document.getElementById('calModal'); if(m) m.style.display='none'; };
+      var m2=document.getElementById('calModal'); if(m2) m2.style.display='flex';
+    }
+
+    var scModeEl = document.getElementById('scMode'); if (scModeEl) scModeEl.addEventListener('change', ()=> setModeUI(els.scMode && els.scMode.value || 'times'));
+    document.getElementById('btnAddTime').addEventListener('click', ()=> addTimeSlot('13:00'));
+    document.getElementById('btnSaveSchedule').addEventListener('click', ()=> saveSchedule().catch(e=> showToast('error','Save failed: '+e.message)));
+    document.getElementById('btnPlanNow').addEventListener('click', async ()=> { try { await fetchJSON('/ig/plan', { method:'POST' }); await loadStatus(); await loadLogs(); showToast('success','Planned'); } catch(e){ showToast('error','Plan failed: '+e.message); } });
+    // Calendar controls
+    var btnCalPrev = document.getElementById('btnCalPrev'); if (btnCalPrev) btnCalPrev.addEventListener('click', function(){ if (!calWeekStart) calWeekStart=startOfWeek(new Date()); calWeekStart.setDate(calWeekStart.getDate()-7); renderCalendar(); });
+    var btnCalNext = document.getElementById('btnCalNext'); if (btnCalNext) btnCalNext.addEventListener('click', function(){ if (!calWeekStart) calWeekStart=startOfWeek(new Date()); calWeekStart.setDate(calWeekStart.getDate()+7); renderCalendar(); });
+    var btnCalToday = document.getElementById('btnCalToday'); if (btnCalToday) btnCalToday.addEventListener('click', function(){ calWeekStart=startOfWeek(new Date()); renderCalendar(); });
+    if (els.btnUpcPrev) els.btnUpcPrev.addEventListener('click', function(){ upcPage = Math.max(1, upcPage-1); renderUpcoming(); });
+    if (els.btnUpcNext) els.btnUpcNext.addEventListener('click', function(){ upcPage = upcPage+1; renderUpcoming(); });
+    var btnUpcRemoveSel = document.getElementById('btnUpcRemoveSel'); if (btnUpcRemoveSel) btnUpcRemoveSel.addEventListener('click', async function(){
+      var total = upcSelected ? upcSelected.size : 0; if (!total) return;
+      if (!confirm('Remove '+ total +' selected item(s)? This cannot be undone.')) return;
+      // Map keys back to ids
+      const all = upcAll || [];
+      for (const k of Array.from(upcSelected)){
+        let id = null;
+        if (String(k).startsWith('fn:')){ const fn = String(k).slice(3); const hit = all.find(function(it){ return it.filename===fn; }); id = hit && hit.id; }
+        else { id = k; }
+        if (id){ try { await fetchJSON('/ig/posts/'+encodeURIComponent(String(id)), { method:'DELETE' }); } catch(e){} }
+      }
+      upcSelected.clear();
+      await loadStatus(); await loadLogs();
+      updateUpcSelectedInfo((upcAll && upcAll.length)||0);
+    });
+    var chkUpcSelectAll = document.getElementById('chkUpcSelectAll'); if (chkUpcSelectAll) chkUpcSelectAll.addEventListener('change', function(){
+      var grid = document.getElementById('upcoming'); var pageBoxes = grid ? grid.querySelectorAll('input[type="checkbox"].upc-sel') : [];
+      var total = (upcAll && upcAll.length) || 0;
+      pageBoxes.forEach(function(b){ var keyEl = (b.parentElement && b.parentElement.querySelector('img.thumb')) ? b.parentElement.querySelector('img.thumb') : null; var fn = keyEl ? keyEl.getAttribute('src') : null; });
+      pageBoxes.forEach(function(b){ var row = b.parentElement; var fnameEl = row ? row.querySelector('div > strong') : null; var fname = fnameEl ? fnameEl.textContent : null; var key = null; var entry = (upcAll||[]).find(function(it){ return it.filename===fname; }); key = entry && entry.id ? String(entry.id) : ('fn:'+fname); if (chkUpcSelectAll.checked){ b.checked=true; if (key) upcSelected.add(key); } else { b.checked=false; if (key) upcSelected.delete(key); } });
+      updateUpcSelectedInfo(total);
+    });
+
+    // Health
+    function renderHealth(h){
+      const c = els.healthCards; if (!c) return; c.innerHTML='';
+      const cards = [];
+      cards.push({ label:'Uptime', value: (h.server && h.server.uptimeSec!=null) ? (Math.floor(h.server.uptimeSec/3600)+'h '+Math.floor((h.server.uptimeSec%3600)/60)+'m') : '-' });
+      cards.push({ label:'Queue depth', value: (h.scheduler && h.scheduler.counts) ? String(h.scheduler.counts.QUEUED) : '-' });
+      cards.push({ label:'Posts/hr (24h)', value: (h.logs && h.logs.postsPerHour != null ? String(h.logs.postsPerHour) : '-') });
+      cards.push({ label:'Success rate (24h)', value: (h.logs && h.logs.successRate24h != null ? (h.logs.successRate24h+'%') : '-') });
+      cards.push({ label:'Memory (heap used)', value: (h.memory ? (h.memory.heapUsedMB+' MB') : '-') });
+      cards.push({ label:'Disk free', value: (h.fs && h.fs.disk && h.fs.disk.freeMB != null ? (h.fs.disk.freeMB+' MB') : '-') });
+      cards.push({ label:'IG API', value: ((h.ig_api && h.ig_api.status) || '-') });
+      cards.forEach(function(k){ var d=document.createElement('div'); d.className='health-card'; d.innerHTML='<div class=\'hlabel\'>'+k.label+'</div><div class=\'hvalue\'>'+k.value+'</div>'; c.appendChild(d); });
+      const a = els.healthAlerts; if (a) { a.innerHTML=''; (h.alerts||[]).forEach((al)=>{ const d=document.createElement('div'); d.className='alert '+al.severity; d.textContent = `[${al.severity}] ${al.message}`; a.appendChild(d); if (al.severity==='CRITICAL') notifyCritical(al.message); }); }
+    }
+
+    async function loadHealth(){
+      try {
+        const probe = (els.chkProbeIG && els.chkProbeIG.checked) ? '1' : '0';
+        const h = await fetchJSON('/ig/health/detailed?probe='+probe+'&t='+Date.now(), { cache:'no-store' });
+        renderHealth(h);
+      } catch(e){ /* silent */ }
+    }
+
+    function notifyCritical(msg){
+      try {
+        if (!('Notification' in window)) return;
+        if (Notification.permission === 'granted') new Notification('BulkIG Critical Alert', { body: msg });
+      } catch {}
+    }
+
+    if (els.btnEnableAlerts) els.btnEnableAlerts.addEventListener('click', ()=>{ try { if ('Notification' in window) Notification.requestPermission(); } catch {} });
+
+    function renderStats(list){
+      const el = document.getElementById('logStats'); if (!el) return;
+      // compute last 24h successes and errors
+      const now = Date.now();
+      const dayAgo = now - 24*3600*1000;
+      let succ=0, err=0;
+      const perHour = Array(24).fill(0);
+      list.forEach(l => {
+        const t = Date.parse(l.ts); if (isNaN(t) || t < dayAgo) return;
+        const cat = (l.category||'').toUpperCase();
+        if (cat==='SUCCESS') { succ++; const h = new Date(t).getHours(); perHour[h] = (perHour[h]||0)+1; }
+        if (cat==='ERROR') err++;
+      });
+      const total = succ + err;
+      const rate = total ? Math.round((succ/total)*100) : 0;
+      // simple sparkline-like string for error trend across last 7 days
+      const days = Array(7).fill(0);
+      list.forEach(l => {
+        const dt = new Date(l.ts);
+        const dIdx = Math.floor((now - dt.getTime())/(24*3600*1000));
+        if (dIdx>=0 && dIdx<7 && (l.category||'').toUpperCase()==='ERROR') days[6-dIdx]++;
+      });
+      const bars = days.map(n => '▮'.repeat(Math.min(5, n)) || '·').join(' ');
+      const pph = Math.round((succ)/24 * 10)/10;
+      el.innerHTML = '';
+      const cards = [];
+      cards.push({ label:'Posts/hr (24h)', value: String(pph) });
+      cards.push({ label:'Success rate (24h)', value: rate + '%' });
+      cards.push({ label:'Success (24h)', value: String(succ) });
+      cards.push({ label:'Errors (24h)', value: String(err) });
+      cards.forEach(function(c){
+        const d = document.createElement('div'); d.className='statcard';
+        d.innerHTML = '<div class=\'statlabel\'>'+c.label+'</div><div class=\'statvalue\'>'+c.value+'</div>';
+        el.appendChild(d);
+      });
+      // error trend row
+      const trend = document.createElement('div'); trend.className='statcard'; trend.style.gridColumn = '1 / -1';
+      trend.innerHTML = `<div class='statlabel'>Error trend (7d)</div><div class='statvalue'>${bars}</div>`;
+      el.appendChild(trend);
+    }
+
+    function uploadFiles(files) {
+      (async () => {
+        for (const f of files) {
+          const fd = new FormData(); fd.append('file', f, f.name);
+          await fetchJSON('/ig/upload', { method: 'POST', body: fd });
+        }
+        await loadStatus(); await loadLogs();
+      })().catch(e => alert('Upload failed: ' + e.message));
+    }
+
+    els.dropzone.addEventListener('click', () => els.fileInput.click());
+    els.fileInput.addEventListener('change', (e) => uploadFiles(e.target.files));
+
+    els.dropzone.addEventListener('dragover', (e) => { e.preventDefault(); els.dropzone.style.borderColor = '#60a5fa'; });
+    els.dropzone.addEventListener('dragleave', (e) => { e.preventDefault(); els.dropzone.style.borderColor = '#334155'; });
+    els.dropzone.addEventListener('drop', (e) => {
+      e.preventDefault(); els.dropzone.style.borderColor = '#334155';
+      const files = e.dataTransfer.files; if (files && files.length) uploadFiles(files);
+    });
+
+    // Keywords logic
+    let kwState = { categories: {} };
+
+    function renderKeywords() {
+      const root = els.kwCategories; if (!root) return;
+      root.innerHTML = '';
+      const cats = kwState.categories || {};
+      Object.keys(cats).forEach(cat => {
+        const wrap = document.createElement('div');
+        wrap.className = 'kw-cat';
+        const title = document.createElement('div');
+        title.innerHTML = `<strong>${cat}</strong>`;
+        const list = document.createElement('div');
+        list.className = 'kw-list';
+        (cats[cat] || []).forEach(k => {
+          const chip = document.createElement('span');
+          chip.className = 'kw-chip';
+          chip.textContent = k;
+          chip.title = 'Click to select/deselect';
+          chip.dataset.keyword = k;
+          chip.dataset.category = cat;
+          chip.onclick = () => chip.classList.toggle('active');
+          // removable X
+          const x = document.createElement('button');
+          x.textContent = '×'; x.className='secondary'; x.style.marginLeft='6px'; x.onclick = async (e)=>{
+            e.stopPropagation();
+            try {
+              await fetchJSON('/ig/keywords', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ category: cat, action:'remove', keyword:k }) });
+              await loadKeywords();
+            } catch (e){ showToast('error','Remove failed'); }
+          };
+          const chipWrap = document.createElement('span'); chipWrap.appendChild(chip); chipWrap.appendChild(x); chipWrap.style.marginRight='6px';
+          list.appendChild(chipWrap);
+        });
+        const addRow = document.createElement('div');
+        addRow.className = 'row';
+        const inp = document.createElement('input'); inp.placeholder = 'Add keyword (with or without #)';
+        const btn = document.createElement('button'); btn.textContent = '+ Add'; btn.className='secondary';
+        btn.onclick = async () => {
+          const v = String(inp.value || '').trim(); if (!v) return; inp.disabled=true; btn.disabled=true;
+          try { await fetchJSON('/ig/keywords', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ category: cat, action:'add', keyword: v }) }); inp.value=''; await loadKeywords(); }
+          catch(e){ showToast('error','Add failed: ' + e.message); }
+          finally { inp.disabled=false; btn.disabled=false; }
+        };
+        addRow.appendChild(inp); addRow.appendChild(btn);
+        wrap.appendChild(title); wrap.appendChild(list); wrap.appendChild(addRow);
+        root.appendChild(wrap);
+      });
+    }
+
+    async function loadKeywords() {
+      kwState = await fetchJSON('/ig/keywords?t=' + Date.now(), { cache:'no-store' });
+      renderKeywords();
+    }
+
+    function selectedKeywordsFromUI(){
+      const chips = (els.kwCategories || document.body).querySelectorAll('.kw-chip.active');
+      return Array.from(chips).map(function(c){ return String((c && c.dataset && c.dataset.keyword) || ''); }).filter(Boolean);
+    }
+
+    if (els.btnGenerate) els.btnGenerate.addEventListener('click', async ()=>{
+      try {
+        const filename = (els.cpFilename && els.cpFilename.value) ? els.cpFilename.value : 'sample.jpg';
+        const mediaType = (els.cpMediaType && els.cpMediaType.value) ? els.cpMediaType.value : 'image';
+        const keywords = selectedKeywordsFromUI();
+        const out = await fetchJSON('/ig/caption', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ filename, mediaType, keywords }) });
+        if (els.cpOutput) els.cpOutput.value = out.caption || '';
+        showToast('success','Caption generated');
+      } catch(e){ showToast('error','Generate failed: '+ e.message); }
+    });
+
+    // History UI
+    let histPageNum = 1;
+    async function loadHistory(page){
+      histPageNum = Math.max(1, page||1);
+      const data = await fetchJSON(`/ig/history?page=${histPageNum}&limit=10&t=${Date.now()}`, { cache:'no-store' });
+      if (els.histPage) els.histPage.textContent = `Page ${histPageNum}`;
+      const root = els.histList; if (!root) return; root.innerHTML='';
+      (data.items||[]).forEach(item => {
+        const row = document.createElement('div'); row.className='item';
+        const img = document.createElement('img'); img.className='thumb'; img.src = item.thumbnail_url + `?t=${Date.now()}`;
+        const info = document.createElement('div');
+        const icon = item.is_repost ? ' 🔁' : '';
+        info.innerHTML = `<div><strong>${item.filename}${icon}</strong></div><div class='muted'>${fmtTime(item.published_at)}</div>`;
+        const btn = document.createElement('button'); btn.textContent='🔁 Repost'; btn.className='secondary'; btn.onclick = async ()=>{
+          try { await fetchJSON(`/ig/repost/${encodeURIComponent(item.id)}`, { method:'POST' }); showToast('success','Repost scheduled'); await loadStatus(); await loadLogs(); }
+          catch(e){ showToast('error','Repost failed: ' + e.message); }
+        };
+        row.appendChild(img); row.appendChild(info); row.appendChild(btn);
+        root.appendChild(row);
+      });
+    }
+    if (els.btnHistPrev) els.btnHistPrev.addEventListener('click', ()=> loadHistory(histPageNum-1).catch(e=> showToast('error','Load failed')));
+    if (els.btnHistNext) els.btnHistNext.addEventListener('click', ()=> loadHistory(histPageNum+1).catch(e=> showToast('error','Load failed')));
+
+    // Tabs
+    function showSchedule(){ document.getElementById('schedPanel').style.display='block'; if (els.kwPanel) els.kwPanel.style.display='none'; if (els.histPanel) els.histPanel.style.display='none'; if (els.healthPanel) els.healthPanel.style.display='none'; }
+    function showKeywords(){ document.getElementById('schedPanel').style.display='none'; if (els.kwPanel) els.kwPanel.style.display='block'; if (els.histPanel) els.histPanel.style.display='none'; if (els.healthPanel) els.healthPanel.style.display='none'; }
+    function showHistory(){ document.getElementById('schedPanel').style.display='none'; if (els.kwPanel) els.kwPanel.style.display='none'; if (els.histPanel) els.histPanel.style.display='block'; if (els.healthPanel) els.healthPanel.style.display='none'; loadHistory(1).catch(()=>{}); }
+    function showHealth(){ document.getElementById('schedPanel').style.display='none'; if (els.kwPanel) els.kwPanel.style.display='none'; if (els.histPanel) els.histPanel.style.display='none'; if (els.healthPanel) els.healthPanel.style.display='block'; loadHealth().catch(()=>{}); }
+    if (els.tabSchedule) els.tabSchedule.addEventListener('click', showSchedule);
+    if (els.tabKeywords) els.tabKeywords.addEventListener('click', showKeywords);
+    if (els.tabHistory) els.tabHistory.addEventListener('click', showHistory);
+    if (els.tabHealth) els.tabHealth.addEventListener('click', showHealth);
+
+    function showToast(type, text) {
+      if (!els.toasts) return;
+      const d = document.createElement('div'); d.className = 'toast ' + type; d.textContent = text; els.toasts.appendChild(d);
+      setTimeout(() => d.remove(), 3500);
+    }
+
+    // Initial load
+    loadStatus().catch(console.error);
+    loadLogs().catch(console.error);
+    loadSchedule().catch(console.error);
+    loadKeywords().catch(console.error);
+    loadCalendar().catch(console.error);
+    // Optionally pre-load a page of history in background
+    loadHistory(1).catch(()=>{});
+  </script>
+</body>
+</html>
+</html>

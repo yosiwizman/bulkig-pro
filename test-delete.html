@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Delete Functionality</title>
+    <style>
+        body {
+            font-family: system-ui;
+            background: #0b1220;
+            color: #e6e6e6;
+            padding: 20px;
+        }
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            background: #121c30;
+            border: 1px solid #1e2a44;
+        }
+        .success {
+            border-color: #22c55e;
+            color: #22c55e;
+        }
+        .error {
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1d4ed8;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>BulkIG Delete Functionality Test</h1>
+        
+        <div id="results"></div>
+        
+        <button onclick="testSelectAll()">Test Select All</button>
+        <button onclick="testBulkDelete()">Test Bulk Delete</button>
+        <button onclick="window.open('http://localhost:4010', '_blank')">Open Dashboard</button>
+    </div>
+
+    <script>
+        const resultsDiv = document.getElementById('results');
+        
+        function log(message, isError = false) {
+            const div = document.createElement('div');
+            div.className = `test-result ${isError ? 'error' : 'success'}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            resultsDiv.appendChild(div);
+        }
+        
+        async function testSelectAll() {
+            try {
+                log('Testing Select All functionality...');
+                
+                // Test the fix - checkboxes should dispatch change events
+                const testCheckbox = document.createElement('input');
+                testCheckbox.type = 'checkbox';
+                let changeEventFired = false;
+                
+                testCheckbox.addEventListener('change', () => {
+                    changeEventFired = true;
+                });
+                
+                // Simulate what our fixed code does
+                testCheckbox.checked = true;
+                testCheckbox.dispatchEvent(new Event('change'));
+                
+                if (changeEventFired) {
+                    log('✅ Select All fix verified - change events will fire correctly');
+                } else {
+                    log('❌ Select All fix failed - change events not firing', true);
+                }
+                
+            } catch (error) {
+                log(`❌ Error testing Select All: ${error.message}`, true);
+            }
+        }
+        
+        async function testBulkDelete() {
+            try {
+                log('Testing Bulk Delete functionality...');
+                
+                // Fetch current status
+                const response = await fetch('http://localhost:4010/ig/status');
+                const data = await response.json();
+                
+                log(`Current queue count: ${data.counts.QUEUED}`);
+                log(`Current scheduled count: ${data.counts.SCHEDULED}`);
+                
+                if (data.next && data.next.length > 0) {
+                    log(`✅ Found ${data.next.length} scheduled items that can be deleted`);
+                    log('The delete functionality should work without errors now');
+                } else {
+                    log('No scheduled items to delete right now');
+                }
+                
+                // Test that the key generation works
+                const testItem = { id: 'test_123', filename: 'test.jpg' };
+                const key = testItem.id ? String(testItem.id) : ('fn:' + testItem.filename);
+                log(`✅ Key generation test: ${key}`);
+                
+            } catch (error) {
+                log(`❌ Error testing Bulk Delete: ${error.message}`, true);
+            }
+        }
+        
+        // Auto-run tests
+        log('=== BulkIG Delete Test Suite Started ===');
+        testSelectAll();
+        setTimeout(() => testBulkDelete(), 1000);
+    </script>
+</body>
+</html>

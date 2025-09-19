@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Layout Test</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: system-ui;
+            background: #0b1220;
+            color: white;
+        }
+        .test-grid {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            grid-column-gap: 24px;
+            padding: 20px;
+            height: 100vh;
+            background: #0b1220;
+        }
+        .left {
+            background: #121c30;
+            border: 2px solid #2563eb;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+        .right {
+            background: #1e2a44;
+            border: 2px solid #dc2626;
+            padding: 20px;
+            position: relative;
+            z-index: 0;
+            contain: layout;
+        }
+        h2 {
+            margin-top: 0;
+        }
+        .success {
+            color: #22c55e;
+        }
+        .error {
+            color: #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-grid">
+        <div class="left">
+            <h2>Left Sidebar (340px)</h2>
+            <p class="success">✓ Fixed width: 340px</p>
+            <p class="success">✓ Z-index: 1 (higher)</p>
+            <p class="success">✓ Blue border</p>
+            <p class="success">✓ No overlap</p>
+        </div>
+        <div class="right">
+            <h2>Right Content (Flexible)</h2>
+            <p class="success">✓ Flexible width</p>
+            <p class="success">✓ Z-index: 0 (lower)</p>
+            <p class="success">✓ Red border</p>
+            <p class="success">✓ Contain: layout</p>
+            <p class="success">✓ 24px gap from sidebar</p>
+        </div>
+    </div>
+</body>
+</html>

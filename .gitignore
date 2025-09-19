@@ -1,0 +1,113 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Build outputs
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+.next/
+out/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+.history/
+
+# Test coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# Temporary files
+*.tmp
+*.temp
+.temp/
+.tmp/
+.cache/
+
+# Media files (Instagram content folder)
+C:/IG/inbox/*
+/IG/inbox/*
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Debug
+.vscode/launch.json
+.vscode/settings.json
+
+# Miscellaneous
+.eslintcache
+.prettierignore
+.stylelintcache
+*.pid
+*.seed
+*.pid.lock
+
+# Mac specific
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# BulkIG specific files
+data/
+media/
+inbox/
+reports/
+apps/logs/activity.json
+apps/ig-poster/data/
+bulkig-start.ps1
+apps/ig-poster/launch-latest.ps1
+apps/ig-poster/create-shortcut*.ps1
+
+# Package manager lock files (keep one)
+package-lock.json
+yarn.lock
+
+# Backup and temporary files
+*.bak
+*.backup
+*.old
+*.orig
