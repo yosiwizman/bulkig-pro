@@ -1,13 +1,14 @@
 import { app, BrowserWindow, Menu, Tray } from 'electron';
 import path from 'path';
 import fs from 'fs';
-import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
+import { spawn, type ChildProcess } from 'child_process';
 import fetch from 'node-fetch';
 import { autoUpdater } from 'electron-updater';
+import { decrypt } from '../secure';
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
-let serverProcess: ChildProcessWithoutNullStreams | null = null;
+let serverProcess: ChildProcess | null = null;
 
 function getAppDataRoot() {
   const root = path.join(app.getPath('userData'), 'BulkIG-Pro');
@@ -30,21 +31,52 @@ async function waitForServer(base = 'http://localhost:4011', timeoutMs = 30000) 
 }
 
 function startServer() {
-  const { inbox, license } = getAppDataRoot();
-  const env = Object.assign({}, process.env, {
+  const { inbox, license, root } = getAppDataRoot();
+
+  // Load saved settings and inject into env before spawning
+  const settingsPath = path.join(root, 'settings.json');
+  const injected: Record<string,string> = {};
+  try {
+    if (fs.existsSync(settingsPath)) {
+      const raw = fs.readFileSync(settingsPath, 'utf8');
+      const j = JSON.parse(raw || '{}');
+      if (j.igUserId) injected.IG_USER_ID = String(j.igUserId);
+      if (j.fbToken) injected.FB_LONG_LIVED_PAGE_TOKEN = decrypt(String(j.fbToken));
+      if (j.openaiKey) injected.OPENAI_API_KEY = decrypt(String(j.openaiKey));
+    }
+  } catch {}
+
+  const env = Object.assign({}, process.env, injected, {
     IG_POSTER_PORT: String(process.env.IG_POSTER_PORT || '4011'),
     STATIC_SERVER_PORT: String(process.env.STATIC_SERVER_PORT || '5006'),
     INBOX_PATH: inbox,
     LICENSE_PATH: license,
+    BULKIG_PRO_DATA_DIR: root,
   });
 
-  // Always spawn compiled server (requires `pnpm build` before dev)
-  const serverEntry = path.resolve(process.cwd(), 'apps', 'ig-poster', 'dist', 'index.js');
-  serverProcess = spawn(process.execPath, [serverEntry], {
-    env,
-    stdio: 'inherit',
-    windowsHide: true,
-  });
+  const isDev = !app.isPackaged;
+  if (isDev) {
+    // Use tsx to run TypeScript directly in dev to avoid ESM/CJS friction
+    const tsxBin = process.platform === 'win32'
+      ? path.resolve(process.cwd(), 'node_modules', '.bin', 'tsx.cmd')
+      : path.resolve(process.cwd(), 'node_modules', '.bin', 'tsx');
+    const srcEntry = path.resolve(process.cwd(), 'apps', 'ig-poster', 'src', 'index.ts');
+    serverProcess = spawn(tsxBin, [srcEntry], {
+      env,
+      stdio: 'inherit',
+      windowsHide: true,
+    });
+  } else {
+    // Spawn compiled server for production (from packaged app resources)
+    const appPath = app.getAppPath();
+    const serverEntry = path.resolve(appPath, 'apps', 'ig-poster', 'dist', 'index.js');
+    // Use fork to run as a Node child without launching a new Electron window
+    serverProcess = spawn(process.execPath, [serverEntry, '--no-sandbox'], {
+      env,
+      stdio: 'inherit',
+      windowsHide: true,
+    });
+  }
   serverProcess.on('exit', (code) => {
     console.log('[SERVER] exited with code', code);
     serverProcess = null;
@@ -72,7 +104,15 @@ function createWindow() {
     }
   });
 
-  mainWindow.on('ready-to-show', () => mainWindow?.show());
+  mainWindow.on('ready-to-show', () => {
+    try {
+      mainWindow?.show();
+      // Bring to front briefly so it isn't hidden behind other windows
+      mainWindow?.setAlwaysOnTop(true);
+      mainWindow?.focus();
+      setTimeout(() => { try { mainWindow?.setAlwaysOnTop(false); } catch {} }, 1500);
+    } catch {}
+  });
 
   mainWindow.loadURL('http://localhost:4011');
 }
@@ -106,7 +146,7 @@ async function bootstrap() {
   const ok = await waitForServer('http://localhost:4011', 45000);
   if (!ok) console.warn('[ELECTRON] Server did not respond in time');
   createWindow();
-  createTray();
+  try { createTray(); } catch (e) { console.warn('[ELECTRON] Tray init failed:', (e as any)?.message || e); }
   try { autoUpdater.checkForUpdatesAndNotify().catch(()=>{}); } catch {}
 }
 
@@ -119,11 +159,9 @@ app.on('before-quit', () => {
   }
 });
 
-app.on('window-all-closed', (e) => {
+app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
-  } else {
-    e.preventDefault();
   }
 });
 

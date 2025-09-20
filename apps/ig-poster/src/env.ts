@@ -10,6 +10,7 @@ export const cfg = {
   mock: (process.env.IG_MOCK || 'false').toLowerCase() === 'true',
   igUserId: process.env.IG_USER_ID || '',
   fbToken: process.env.FB_LONG_LIVED_PAGE_TOKEN || '',
+  openaiApiKey: process.env.OPENAI_API_KEY || '',
   generatorUrl: process.env.GENERATOR_URL || 'http://localhost:4001',
   inboxPath: process.env.INBOX_PATH || defaultInbox,
   staticPort: parseInt(process.env.STATIC_SERVER_PORT || '5006', 10),

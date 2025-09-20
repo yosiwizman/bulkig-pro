@@ -230,7 +230,7 @@ For issues and questions:
 
 - Instagram Basic Display API
 - Cloudflare Tunnel
-- Live Pilates USA for inspiration
+- Thanks to the open-source community for inspiration
 
 ---
 

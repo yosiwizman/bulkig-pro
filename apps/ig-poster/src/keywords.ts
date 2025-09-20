@@ -5,10 +5,10 @@ export type Category = 'Business' | 'Fitness' | 'Motivation' | 'Location';
 const CATEGORIES: Category[] = ['Business','Fitness','Motivation','Location'];
 
 const initial: Record<Category, string[]> = {
-  Business: ['#livepilatesusa', '#miami', '#pilates', '#studio', '#wellness'],
-  Fitness: ['#pilateslife', '#strength', '#flexibility', '#mindfulness'],
-  Motivation: ['#mondaymotivation', '#fitnessgoals', '#healthylifestyle'],
-  Location: ['#miami', '#florida', '#pilatesstudio'],
+  Business: [],
+  Fitness: [],
+  Motivation: [],
+  Location: [],
 };
 
 const store: Record<Category, Set<string>> = {

@@ -6,9 +6,11 @@ files:
   - assets/**/*
   - apps/ig-poster/dist/**/*
   - apps/ig-poster/public/**/*
+  - node_modules/**/*
+  - package.json
 win:
   target: nsis
-  icon: assets/icon.ico
+  icon: assets/icon.png
 mac:
   target: dmg
   icon: assets/icon.icns
