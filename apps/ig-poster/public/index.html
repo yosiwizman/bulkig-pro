@@ -533,7 +533,7 @@
         <button id="btnViewDrafts" class="secondary">📄 View Generated Posts (<span id="draftCount">0</span>)</button>
         <button id="btnRefresh" class="secondary">Refresh</button>
         <button id="settingsBtn" class="btn-icon" onclick="openSettings()" title="Settings">⚙️</button>
-        <label class="row"><input id="chkAuto" type="checkbox" checked style="transform: scale(1.2); margin-right:6px;"> Auto-refresh</label>
+        <label class="row"><input id="chkAuto" type="checkbox" style="transform: scale(1.2); margin-right:6px;"> Auto-refresh</label>
       </div>
     </header>
     
@@ -1647,23 +1647,27 @@
     }
 
     async function loadStatus() {
-      const s = await fetchJSON('/ig/status?t=' + Date.now(), { cache: 'no-store' });
-      els.autorunVal.textContent = s.autorun ? 'ON' : 'OFF';
-      els.autorunBtn.textContent = 'Autorun: ' + (s.autorun ? 'ON' : 'OFF');
-      els.queued.textContent = s.counts.QUEUED;
-      els.scheduled.textContent = s.counts.SCHEDULED;
-      els.publishing.textContent = s.counts.PUBLISHING;
-      els.published.textContent = s.counts.PUBLISHED;
-      els.lastPlan.textContent = s.lastPlanRun ? fmtTime(s.lastPlanRun) : '-';
+      try {
+        const s = await fetchJSON('/ig/status?t=' + Date.now(), { cache: 'no-store' });
+        els.autorunVal.textContent = s.autorun ? 'ON' : 'OFF';
+        els.autorunBtn.textContent = 'Autorun: ' + (s.autorun ? 'ON' : 'OFF');
+        els.queued.textContent = s.counts.QUEUED;
+        els.scheduled.textContent = s.counts.SCHEDULED;
+        els.publishing.textContent = s.counts.PUBLISHING;
+        els.published.textContent = s.counts.PUBLISHED;
+        els.lastPlan.textContent = s.lastPlanRun ? fmtTime(s.lastPlanRun) : '-';
 
-      // update upcoming source
-      upcAll = (s.next || []);
-      renderCompactScheduled();
-      renderUpcoming();
-      
-      // Update count in button
-      if (els.scheduledCount) {
-        els.scheduledCount.textContent = upcAll.length;
+        // update upcoming source
+        upcAll = (s.next || []);
+        renderCompactScheduled();
+        renderUpcoming();
+        
+        // Update count in button
+        if (els.scheduledCount) {
+          els.scheduledCount.textContent = upcAll.length;
+        }
+      } catch (e) {
+        console.warn('loadStatus failed', e);
       }
     }
 
@@ -1964,17 +1968,21 @@
     }
 
     async function loadLogs() {
-      const logs = await fetchJSON('/ig/logs?limit=500&t=' + Date.now(), { cache: 'no-store' });
-      const newest = logs[logs.length - 1]?.ts || '';
-      const recent = lastLogTs ? logs.filter(l => l.ts > lastLogTs) : logs;
-      recent.forEach(l => {
-        const cat = (l.category||'').toUpperCase();
-        if (cat === 'SUCCESS') showToast('success', l.message);
-        if (cat === 'ERROR') showToast('error', l.message);
-      });
-      lastLogTs = newest;
-      logsCache = logs;
-      renderLogs();
+      try {
+        const logs = await fetchJSON('/ig/logs?limit=500&t=' + Date.now(), { cache: 'no-store' });
+        const newest = logs[logs.length - 1]?.ts || '';
+        const recent = lastLogTs ? logs.filter(l => l.ts > lastLogTs) : logs;
+        recent.forEach(l => {
+          const cat = (l.category||'').toUpperCase();
+          if (cat === 'SUCCESS') showToast('success', l.message);
+          if (cat === 'ERROR') showToast('error', l.message);
+        });
+        lastLogTs = newest;
+        logsCache = logs;
+        renderLogs();
+      } catch (e) {
+        console.warn('loadLogs failed', e);
+      }
     }
 
     els.autorunBtn.addEventListener('click', async () => {
@@ -2362,7 +2370,18 @@
       });
     }
 
-    let timer = setInterval(async () => { if (els.chkAuto.checked) { await loadStatus(); await loadLogs(); await loadHealth(); await loadDrafts(); } }, 3000);
+    let timer = setInterval(async () => {
+      if (els.chkAuto && els.chkAuto.checked) {
+        try {
+          await loadStatus();
+          await loadLogs();
+          await loadHealth();
+          await loadDrafts();
+        } catch (e) {
+          console.warn('Auto-refresh error', e);
+        }
+      }
+    }, 30000);
 
     // Scheduler UI
     function setModeUI(mode){
@@ -4889,8 +4908,10 @@
         const emptyState = document.getElementById('postLibraryEmpty');
         const countEl = document.getElementById('postLibraryCount');
         
+        const totalPosts = filteredPosts.length;
+        const displayPosts = filteredPosts.slice(0, 50);
         if (countEl) {
-          countEl.textContent = `${posts.length} autopilot posts`;
+          countEl.textContent = `Showing ${displayPosts.length} of ${totalPosts} autopilot posts`;
         }
         
         if (filteredPosts.length === 0) {
@@ -4903,7 +4924,7 @@
           if (grid) {
             grid.innerHTML = '';
             
-            filteredPosts.forEach(post => {
+            displayPosts.forEach(post => {
               const card = document.createElement('div');
               card.style.cssText = 'background: #121c30; border: 1px solid #1e2a44; border-radius: 8px; overflow: hidden;';
               
