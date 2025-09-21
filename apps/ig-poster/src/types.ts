@@ -1,5 +1,15 @@
 import { z } from 'zod';
 
+export interface PostPlatforms {
+  instagram: boolean;
+  facebook?: {
+    enabled: boolean;
+    pageId: string;
+    pageName?: string;
+    pageAccessToken?: string;
+  };
+}
+
 export interface Post {
   id: string;
   filename: string;
@@ -15,6 +25,8 @@ export interface Post {
   is_repost?: boolean;
   original_post_id?: string; // root original id
   repost_count?: number; // maintained on root original
+  // Platforms config (optional; default instagram true)
+  platforms?: PostPlatforms;
 }
 
 export interface AppState {

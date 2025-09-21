@@ -2,7 +2,14 @@
   "name": "bulkig-pro",
   "version": "0.2.0",
   "description": "Professional Instagram automation platform with AI-powered caption generation and advanced scheduling",
-  "keywords": ["instagram", "automation", "social-media", "scheduling", "ai", "content-management"],
+  "keywords": [
+    "instagram",
+    "automation",
+    "social-media",
+    "scheduling",
+    "ai",
+    "content-management"
+  ],
   "homepage": "https://github.com/yosiwizman/bulkig",
   "repository": {
     "type": "git",
@@ -33,6 +40,12 @@
     "start:pro": "turbo run start",
     "migrate": "tsx scripts/migrate-settings.ts",
     "check-ports": "tsx scripts/check-ports.ts",
+    "electron:dev": "electron apps/ig-poster/dist/electron/main.js",
+    "electron:build": "pnpm build && electron-builder",
+    "dist:win": "pnpm electron:build --win",
+    "dist:mac": "pnpm electron:build --mac",
+    "dist:all": "pnpm electron:build -mwl",
+    "license:generate": "tsx scripts/generate-license.ts",
     "test": "turbo run test",
     "test:coverage": "turbo run test:coverage",
     "test:watch": "turbo run test:watch",
@@ -62,24 +75,53 @@
       "prettier --write"
     ]
   },
+  "main": "apps/ig-poster/dist/electron/main.js",
+  "build": {
+    "files": [
+      "apps/ig-poster/dist/**",
+      "apps/ig-poster/public/**",
+      "node_modules/**",
+      "package.json"
+    ]
+  },
   "devDependencies": {
-    "turbo": "^1.10.0",
+    "@types/jest": "^29.0.0",
     "@types/node": "^20.0.0",
-    "typescript": "^5.0.0",
-    "tsx": "^4.11.0",
-    "prettier": "^3.0.0",
-    "eslint": "^8.50.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
+    "electron": "^29.0.0",
+    "electron-builder": "^24.13.3",
+    "eslint": "^8.50.0",
     "husky": "^8.0.0",
-    "lint-staged": "^15.0.0",
     "jest": "^29.0.0",
-    "@types/jest": "^29.0.0",
-    "ts-jest": "^29.0.0"
+    "lint-staged": "^15.0.0",
+    "prettier": "^3.0.0",
+    "ts-jest": "^29.0.0",
+    "tsx": "^4.11.0",
+    "turbo": "^1.10.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "electron-updater": "^6.1.8",
+    "node-fetch": "^2.6.7",
+    "express": "^4.18.0",
+    "cors": "^2.8.5",
+    "multer": "^1.4.5-lts.1",
+    "mime-types": "^2.1.35",
+    "ffprobe-static": "^3.1.0",
+    "execa": "^8.0.1",
+    "chokidar": "^3.5.0",
+    "p-retry": "^4.6.0",
+    "zod": "^3.23.8",
+    "cloudflared": "^0.5.1",
+    "cheerio": "^1.0.0-rc.12"
   },
   "pnpm": {
     "overrides": {
       "minimatch": "^9.0.5"
-    }
+    },
+    "ignoredBuiltDependencies": [
+      "electron"
+    ]
   }
 }

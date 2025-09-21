@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>BulkIG Dashboard</title>
+  <title>BulkIG Pro</title>
   <link rel="icon" href="data:,">
   <style>
     * { box-sizing: border-box; }
@@ -298,6 +298,22 @@
     button.secondary { background: #334155; }
     button:disabled { opacity: .7; cursor: not-allowed; }
     .list { background:#121c30; border: 1px solid #1e2a44; border-radius:8px; padding:12px; }
+
+    /* Icon-only button for header (settings) */
+    .btn-icon {
+      background: transparent;
+      border: 1px solid #4a5568;
+      color: #e2e8f0;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 18px;
+      transition: all 0.2s;
+    }
+    .btn-icon:hover {
+      background: #2d3748;
+      border-color: #5a9fd4;
+    }
     .item { display:flex; align-items:center; gap: 12px; padding: 8px 0; border-bottom: 1px dashed #1e2a44; }
     .item:last-child { border-bottom: none; }
     .dot { width:10px; height:10px; border-radius:50%; display:inline-block; }
@@ -449,7 +465,7 @@
         padding: 10px 20px; background: #1a1f2e;
         position: fixed; top: 0; left: 0; right: 0; height: 60px; z-index: 1000;
       }
-      .header-buttons { display: flex; gap: 10px; margin-left: auto; flex-wrap: wrap; }
+.header-buttons { display: flex; gap: 10px; margin-left: auto; flex-wrap: wrap; align-items: center; transform: translateY(12px); }
 
       /* Wrapper and sections */
       .dashboard-wrapper { display: flex; height: 100vh; padding-top: 60px; }
@@ -507,7 +523,7 @@
 <body>
   <div class="dashboard">
 <header class="dashboard-header">
-      <h1>BulkIG Dashboard</h1>
+      <h1 class="dashboard-title">BulkIG Pro</h1>
 <div class="toolbar header-buttons">
         <button id="btnAutorun">Autorun: ...</button>
         <button id="btnPlan" class="secondary">Force Plan</button>
@@ -516,6 +532,7 @@
         <button id="btnGenerateDrafts" class="secondary">📝 Generate Caption Drafts</button>
         <button id="btnViewDrafts" class="secondary">📄 View Generated Posts (<span id="draftCount">0</span>)</button>
         <button id="btnRefresh" class="secondary">Refresh</button>
+        <button id="settingsBtn" class="btn-icon" onclick="openSettings()" title="Settings">⚙️</button>
         <label class="row"><input id="chkAuto" type="checkbox" checked style="transform: scale(1.2); margin-right:6px;"> Auto-refresh</label>
       </div>
     </header>
@@ -669,7 +686,7 @@
           <div style="background:#0f172a; border:1px solid #1e2a44; border-radius:8px; padding:16px;">
             <h4 style="margin:0 0 12px 0; color:#e6e6e6; font-size:14px; font-weight:500; display:flex; align-items:center; gap:8px;">🌐 Website Analysis</h4>
             <div style="display:flex; gap:8px; margin-bottom:8px;">
-              <input type="url" id="referenceUrl" placeholder="https://livepilatesusa.com or any website..." style="flex:1; padding: 10px; background: #121c30; color: #e6e6e6; border: 1px solid #334155; border-radius: 6px;">
+              <input type="url" id="referenceUrl" placeholder="https://example.com or any website" style="flex:1; padding: 10px; background: #121c30; color: #e6e6e6; border: 1px solid #334155; border-radius: 6px;">
               <button id="btnAnalyzeUrl" class="secondary" style="white-space:nowrap; min-width:100px;">🔍 Analyze</button>
             </div>
             <div id="analyzeResults" style="display:none; margin-top:12px; padding:12px; background:#121c30; border:1px solid #334155; border-radius:6px;">
@@ -686,7 +703,7 @@
           </div>
           <div>
             <label style=\"display:block; color:#94a3b8; font-size:13px; margin-bottom:6px;\">Keywords (comma-separated)</label>
-            <textarea id="draftGenKeywords" placeholder="pilates, wellness, fitness, miami" style="width: 100%; min-height: 70px; padding: 10px; background: #0f172a; color: #e6e6e6; border: 1px solid #1e2a44; border-radius: 6px;"></textarea>
+            <textarea id="draftGenKeywords" placeholder="dogs, cats, pets (comma-separated)" style="width: 100%; min-height: 70px; padding: 10px; background: #0f172a; color: #e6e6e6; border: 1px solid #1e2a44; border-radius: 6px;"></textarea>
           </div>
           <div>
             <label style="display:block; color:#94a3b8; font-size:13px; margin-bottom:6px;">Number of captions</label>
@@ -1056,7 +1073,7 @@
   </div>
   
   <!-- Post Preview Modal -->
-  <div id="postPreviewModal" class="modal-overlay" style="z-index: 10650;">
+  <div id="postPreviewModal" class="modal-overlay" style="z-index: 13000;">
     <div class="modal-container" style="max-width: 420px; width: 95%;">
       <div class="modal-header">
         <h2 class="modal-title">👁 Post Preview</h2>
@@ -1072,8 +1089,8 @@
             <div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
               <div style="width: 32px; height: 32px; background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%); border-radius: 50%;"></div>
               <div>
-                <div style="color: white; font-weight: 500; font-size: 14px;">livepilatesusa</div>
-                <div style="color: #8e8e8e; font-size: 12px;">Live Pilates USA</div>
+                <div style="color: white; font-weight: 500; font-size: 14px;">yourbrand</div>
+                <div style="color: #8e8e8e; font-size: 12px;">Your Brand</div>
               </div>
             </div>
             <div id="postPreviewMedia" style="background:#1a1a1a; border-radius:4px; aspect-ratio: 1; display:flex; align-items:center; justify-content:center; margin-bottom:12px; color:#555; overflow:hidden;">Media</div>
@@ -1279,6 +1296,26 @@
               <textarea id="postCaption" placeholder="Write your caption here..." 
                 style="width: 100%; min-height: 200px; padding: 12px; background: #0f172a; color: #e6e6e6; border: 1px solid #1e2a44; border-radius: 6px; resize: vertical; font-size: 14px; line-height: 1.5;"></textarea>
             </div>
+
+            <!-- Platform Selector -->
+            <div class="platform-selector" style="margin-bottom: 16px; padding: 12px; background: #0f172a; border: 1px solid #1e2a44; border-radius: 6px;">
+              <h4 style="margin: 0 0 8px 0;">Post to:</h4>
+              <div class="platform-options" style="display:flex; gap:16px; align-items:center;">
+                <label style="display:flex; align-items:center; gap:6px;">
+                  <input type="checkbox" id="postToInstagram" checked>
+                  <span>📷 Instagram</span>
+                </label>
+                <label style="display:flex; align-items:center; gap:6px;">
+                  <input type="checkbox" id="postToFacebook">
+                  <span>📘 Facebook</span>
+                </label>
+              </div>
+              <div id="facebookPageSelector" style="display:none; margin-top: 8px;">
+                <select id="facebookPageSelect" style="background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px; padding:6px; min-width: 260px;">
+                  <option value="">Select Facebook Page</option>
+                </select>
+              </div>
+            </div>
             <div class="row" style="gap:8px; margin: 8px 0 12px 0; flex-wrap: wrap;">
               <button id="btnClearCaption" class="secondary">🧹 Clear</button>
               <button id="btnQuickRegen" class="secondary">♻ Regenerate</button>
@@ -1329,8 +1366,8 @@
               <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
                 <div style="width: 32px; height: 32px; background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%); border-radius: 50%;"></div>
                 <div>
-                  <div style="color: white; font-weight: 500; font-size: 14px;">livepilatesusa</div>
-                  <div style="color: #8e8e8e; font-size: 12px;">Live Pilates USA</div>
+                  <div style="color: white; font-weight: 500; font-size: 14px;">yourbrand</div>
+                  <div style="color: #8e8e8e; font-size: 12px;">Your Brand</div>
                 </div>
               </div>
               
@@ -1377,7 +1414,59 @@
   </div>
   
   <div id="toasts"></div>
+
+  <!-- License Activation Modal -->
+  <div id="licenseModal" class="modal-overlay" style="z-index:20000;">
+    <div class="modal-container" style="max-width: 420px; width: 92%;">
+      <div class="modal-header">
+        <h2 class="modal-title">🔐 Activate BulkIG Pro</h2>
+      </div>
+      <div class="modal-body">
+        <div class="muted" style="margin-bottom:8px;">Enter your email and license key to continue.</div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <input id="licEmail" type="email" placeholder="you@example.com" style="padding:10px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;">
+          <input id="licKey" type="text" placeholder="XXXX-XXXX-XXXX-XXXX" style="padding:10px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px; text-transform:uppercase;">
+          <div id="licError" class="muted" style="color:#ef4444; min-height:18px;"></div>
+          <button id="btnActivate" style="padding:10px; background:#22c55e; color:#fff; border:none; border-radius:6px; cursor:pointer;">Activate</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="modal-overlay" style="z-index:20010; display:none;">
+    <div class="modal-container" style="max-width: 560px; width: 92%;">
+      <div class="modal-header">
+        <h2 class="modal-title">⚙️ Settings</h2>
+        <button class="modal-close" onclick="closeSettings()">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="settings-section" style="margin-bottom:16px;">
+          <h3>Instagram Configuration</h3>
+          <label>Business Account ID:</label>
+          <input type="text" id="igUserId" placeholder="17841465376124483" style="width:100%; padding:8px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;">
+          <label style="margin-top:8px; display:block;">Page Access Token (works for both Instagram & Facebook):</label>
+          <textarea id="fbToken" rows="3" placeholder="Your Meta token - one token for both platforms" style="width:100%; padding:8px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;"></textarea>
+        </div>
+        <div class="settings-section" style="margin-bottom:16px;">
+          <h3>AI Configuration</h3>
+          <label>OpenAI API Key:</label>
+          <input type="password" id="openaiKey" placeholder="sk-..." style="width:100%; padding:8px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;">
+        </div>
+        <div style="display:flex; gap:8px; justify-content:flex-end;">
+          <button class="secondary" onclick="closeSettings()">Cancel</button>
+          <button onclick="saveSettings()" style="background:#22c55e; color:#fff; border:none; border-radius:6px; padding:8px 12px;">Save Settings</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
+    // Settings helpers
+    function openSettings(){ try { (async ()=>{ const r = await fetch('/settings'); const s = await r.json(); const m = document.getElementById('settingsModal'); if (document.getElementById('igUserId')) document.getElementById('igUserId').value = s.igUserId || ''; if (document.getElementById('fbToken')) document.getElementById('fbToken').value = ''; if (document.getElementById('openaiKey')) document.getElementById('openaiKey').value = ''; if (m) m.style.display='flex'; })(); } catch {} }
+    function closeSettings(){ const m = document.getElementById('settingsModal'); if (m) m.style.display='none'; }
+    async function saveSettings(){ try { const igUserId = (document.getElementById('igUserId')||{}).value||''; const fbToken = (document.getElementById('fbToken')||{}).value||''; const openaiKey = (document.getElementById('openaiKey')||{}).value||''; await fetch('/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ igUserId, fbToken, openaiKey }) }); showToast('success','Settings saved'); closeSettings(); } catch(e){ showToast('error','Save failed: ' + (e && e.message || '')); } }
+
     // Modal functions
     function openModal(modalId) {
       const modal = document.getElementById(modalId);
@@ -1407,6 +1496,41 @@
     window.openModal = openModal;
     window.closeModal = closeModal;
     
+    async function ensureLicense() {
+      try {
+        const r = await fetch('/license/status');
+        const j = await r.json();
+        if (!j || j.valid !== true) {
+          const modal = document.getElementById('licenseModal');
+          if (modal) modal.classList.add('show');
+          const btn = document.getElementById('btnActivate');
+          const email = document.getElementById('licEmail');
+          const key = document.getElementById('licKey');
+          const err = document.getElementById('licError');
+          if (btn) btn.addEventListener('click', async () => {
+            try {
+              btn.disabled = true; btn.textContent = '⏳ Verifying...';
+              const body = { email: email.value || '', key: key.value || '' };
+              const r2 = await fetch('/license/activate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+              if (!r2.ok) {
+                const t = await r2.json().catch(()=>({error:'invalid'}));
+                if (err) err.textContent = t && t.error ? String(t.error) : 'Activation failed';
+              } else {
+                if (err) err.textContent = '';
+                const modal2 = document.getElementById('licenseModal');
+                if (modal2) modal2.classList.remove('show');
+                showToast('success', 'License activated');
+              }
+            } catch (e) {
+              if (err) err.textContent = 'Activation error';
+            } finally {
+              btn.disabled = false; btn.textContent = 'Activate';
+            }
+          });
+        }
+      } catch {}
+    }
+
     const els = {
       autorunBtn: document.getElementById('btnAutorun'),
       planBtn: document.getElementById('btnPlan'),
@@ -3000,7 +3124,7 @@
         }
         if (phoneCaptionPreview) {
           const preview = postCaption.value || 'Your caption will appear here...';
-          phoneCaptionPreview.innerHTML = `<span style="font-weight: 500;">livepilatesusa</span> ${preview.replace(/\n/g, '<br>')}`;
+          phoneCaptionPreview.innerHTML = `<span style=\"font-weight: 500;\">yourbrand</span> ${preview.replace(/\\n/g, '<br>')}`;
         }
       });
     }
@@ -3259,6 +3383,21 @@
       });
     });
     
+    function getSelectedPlatforms(){
+      const ig = document.getElementById('postToInstagram');
+      const fb = document.getElementById('postToFacebook');
+      const select = document.getElementById('facebookPageSelect');
+      const instagram = !ig || !!ig.checked; // default true
+      let facebook = undefined;
+      if (fb && fb.checked) {
+        const val = String(select?.value || '');
+        const [pageId, pageToken] = val.includes(':') ? val.split(':') : [val, ''];
+        const pageName = select && select.selectedIndex >= 0 ? select.options[select.selectedIndex].text : '';
+        if (pageId) facebook = { enabled: true, pageId, pageName, pageAccessToken: pageToken || undefined };
+      }
+      return { instagram, facebook };
+    }
+
     // Post Now button
     const btnPostNow = document.getElementById('btnPostNow');
     if (btnPostNow) {
@@ -3316,14 +3455,15 @@
             postStatusMessage.textContent = 'Publishing to Instagram...';
           }
           
-          // Then publish immediately with post type
+          // Then publish immediately with post type and platforms
           await fetchJSON('/ig/post-now', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               filename: uploadedFile.name,
               caption: caption,
-              postType: postType
+              postType: postType,
+              platforms: getSelectedPlatforms()
             })
           });
           
@@ -3486,6 +3626,37 @@
     // Quick-schedule state
     let quickSchedule = null; // { filename, caption }
 
+    // Facebook page selector logic
+    const fbToggle = document.getElementById('postToFacebook');
+    if (fbToggle) {
+      fbToggle.addEventListener('change', async (e) => {
+        const selWrap = document.getElementById('facebookPageSelector');
+        const select = document.getElementById('facebookPageSelect');
+        if (e && e.target && e.target.checked) {
+          try {
+            const r = await fetch('/fb/pages');
+            const data = await r.json();
+            const pages = (data && data.pages) || [];
+            if (Array.isArray(pages) && pages.length) {
+              select.innerHTML = '<option value="">Select Facebook Page</option>' +
+                pages.map((p) => `<option value="${p.id}:${p.access_token}">${p.name}</option>`).join('');
+              selWrap.style.display = 'block';
+            } else {
+              showToast('No Facebook pages found', 'error');
+              if (e && e.target) e.target.checked = false;
+              selWrap.style.display = 'none';
+            }
+          } catch (err) {
+            showToast('Failed to load Facebook pages', 'error');
+            if (e && e.target) e.target.checked = false;
+            selWrap.style.display = 'none';
+          }
+        } else {
+          selWrap.style.display = 'none';
+        }
+      });
+    }
+
     // Confirm Schedule button
     document.getElementById('btnConfirmSchedule')?.addEventListener('click', async () => {
       const dateInput = document.getElementById('scheduleDate');
@@ -3507,7 +3678,7 @@
         if (quickSchedule && quickSchedule.filename) {
           await fetchJSON('/ig/schedule-post', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filename: quickSchedule.filename, scheduled_at: scheduledAt, caption: quickSchedule.caption || '' })
+            body: JSON.stringify({ filename: quickSchedule.filename, scheduled_at: scheduledAt, caption: quickSchedule.caption || '', platforms: getSelectedPlatforms() })
           });
         } else {
           // First upload the file
@@ -3517,7 +3688,7 @@
           // Then schedule the post
           await fetchJSON('/ig/schedule-post', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filename: uploadedFile.name, scheduled_at: scheduledAt, caption: caption })
+            body: JSON.stringify({ filename: uploadedFile.name, scheduled_at: scheduledAt, caption: caption, platforms: getSelectedPlatforms() })
           });
         }
         
@@ -4071,6 +4242,9 @@
 
     window.selectDraftForMedia = selectDraftForMedia;
     window.openDraftPicker = openDraftPicker;
+
+    // License check at startup
+    ensureLicense().catch(()=>{});
 
     // Convert inline onclick buttons to addEventListener bindings
     document.getElementById('activityLogBtn')?.addEventListener('click', openActivityLog);
@@ -5110,6 +5284,22 @@
     loadAutopilotConfig().catch(console.error);
     // Optionally pre-load a page of history in background
     loadHistory(1).catch(()=>{});
+
+    // Safety: also trigger on DOMContentLoaded for robustness
+    window.addEventListener('DOMContentLoaded', function(){
+      try { loadCalendar(); } catch (e) { /* ignore */ }
+    });
+
+    // Delegated click handlers as fallback for dynamic DOM
+    document.addEventListener('click', function(e){
+      var t = e.target || null;
+      if (!t) return;
+      // Fallback for Generate Drafts button
+      // (header button id is #btnGenerateDrafts)
+      if ((t.closest && t.closest('#btnGenerateDrafts'))) {
+        try { openDraftsModal(); } catch (e) {}
+      }
+    });
   </script>
 </body>
 </html>

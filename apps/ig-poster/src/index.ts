@@ -10,6 +10,7 @@ import { execa } from 'execa';
 import ffprobe from 'ffprobe-static';
 import fetch from 'node-fetch';
 import { cfg } from './env';
+import { encrypt, decrypt } from './secure';
 // Cloudflare tunnel (dynamic import via require to avoid TS type issues)
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const cloudflaredLib: any = require('cloudflared');
@@ -74,11 +75,11 @@ const publisher = new Publisher(scheduler);
 
 // Log configuration mode on startup
 console.log('\n' + '='.repeat(60));
-console.log('[CONFIG] Instagram Posting Mode:', cfg.mock ? 'MOCK (Test Mode)' : 'PRODUCTION (Real Posts!)');
-if (!cfg.mock) {
-  console.log('[CONFIG] ✅ Production mode enabled - Real Instagram API calls!');
-  console.log('[CONFIG] Account:', cfg.igUserId ? `@livepilatesusa (${cfg.igUserId})` : 'Not configured');
-} else {
+  console.log('[CONFIG] Instagram Posting Mode:', cfg.mock ? 'MOCK (Test Mode)' : 'PRODUCTION (Real Posts!)');
+  if (!cfg.mock) {
+    console.log('[CONFIG] ✅ Production mode enabled - Real Instagram API calls!');
+    console.log('[CONFIG] Account:', cfg.igUserId ? `@yourbrand (${cfg.igUserId})` : 'Not configured');
+  } else {
   console.log('[CONFIG] ⚠️  Mock mode - Posts will not be published to Instagram');
 }
 console.log('='.repeat(60) + '\n');
@@ -295,11 +296,12 @@ app.get('/ig/schedule-preview', (req, res) => {
 // Force a specific post to publish ASAP
 app.post('/ig/post-now', (req, res) => {
   try {
-    const { id, filename, caption, postType } = req.body as { 
+    const { id, filename, caption, postType, platforms } = req.body as { 
       id?: string; 
       filename?: string; 
       caption?: string;
       postType?: 'POST' | 'STORY' | 'REEL';
+      platforms?: any;
     };
     const state = scheduler.getState();
     let post = state.posts.find(p => (id && p.id === id) || (filename && p.filename === filename));
@@ -314,7 +316,7 @@ app.post('/ig/post-now', (req, res) => {
     
     // If no existing post, create one
     if (!post && filename) {
-      post = scheduler.queueFile(filename);
+      post = scheduler.queueFile(filename, platforms ? ({ platforms } as any) : undefined);
       if (caption) {
         scheduler.updatePost(post.id, { caption });
       }
@@ -338,7 +340,9 @@ app.post('/ig/post-now', (req, res) => {
     }
     
     // Move to immediate publish window
-    scheduler.updatePost(post.id, { status: 'SCHEDULED', scheduled_at: new Date(Date.now() - 1000) });
+    const patch: any = { status: 'SCHEDULED', scheduled_at: new Date(Date.now() - 1000) };
+    if (platforms) patch.platforms = platforms;
+    scheduler.updatePost(post.id, patch);
     addLog('info', `[API] ${type} Now requested for ${post.filename}`);
     publisher.kick().catch(() => {});
     res.json({ success: true, postType: type });
@@ -350,10 +354,11 @@ app.post('/ig/post-now', (req, res) => {
 // Schedule a post for a specific date/time
 app.post('/ig/schedule-post', (req, res) => {
   try {
-    const { filename, caption, scheduled_at } = req.body as { 
+    const { filename, caption, scheduled_at, platforms } = req.body as { 
       filename: string; 
       caption?: string; 
       scheduled_at: string;
+      platforms?: any;
     };
     
     if (!filename || !scheduled_at) {
@@ -374,11 +379,13 @@ app.post('/ig/schedule-post', (req, res) => {
     }
     
     // Update with schedule info
-    scheduler.updatePost(post.id, {
+    const patch: any = {
       caption: sanitizeCaptionServer(caption || post.caption),
       scheduled_at: scheduledDate,
       status: 'SCHEDULED'
-    });
+    };
+    if (platforms) patch.platforms = platforms;
+    scheduler.updatePost(post.id, patch);
     
     // For videos, ensure we use tunnel URL if available
     if (tunnelUrl && post.filename.match(/\.(mp4|mov|avi|webm)$/i)) {
@@ -806,7 +813,7 @@ app.post('/ig/magic-writer', (req, res) => {
     }
     
     // Generate AI caption based on user description
-    const baseCaption = `Welcome to the world of cutting-edge Pilates innovation at Live Pilates USA! 🌟 `;
+    const baseCaption = `Create engaging content for your audience! 🌟 `;
     
     // Build caption based on tone
     let caption = '';
@@ -879,54 +886,37 @@ app.post('/ig/scrape-url', async (req, res) => {
   const url = String((req.body||{}).url||'').trim();
   try {
     if (!url) return res.json({ content: {}, rawText: '' });
-    const response = await fetch(url).catch(()=>null);
-    if (!response || !response.ok) return res.json({ content: {}, rawText: '' });
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+    }).catch(()=>null);
+    if (!response || !response.ok) {
+      return res.json({ content: { error: 'Failed to fetch URL' }, rawText: '' });
+    }
     const html = await response.text();
 
-    // Try dynamic cheerio import if present; fall back to regex parsing
-    let extracted: any = { title:'', products:[], services:[], prices:[], features:[] };
+    let content: any = { title:'', description:'', keywords:'', text:'' };
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const cheerio = require('cheerio');
       const $ = cheerio.load(html);
-      extracted.title = $('h1').first().text() || $('title').text() || '';
-      $('h2, h3, .product-name, .service-title').each((_: number, el: any) => {
-        const t = ($(el).text()||'').trim(); if (t) extracted.products.push(t);
-      });
-      $('.price, .cost, [class*="price"]').each((_: number, el: any) => {
-        const t = ($(el).text()||'').trim(); if (t) extracted.prices.push(t);
-      });
-      $('ul li, .feature, .benefit').each((_: number, el: any) => {
-        const t = ($(el).text()||'').trim(); if (t) extracted.features.push(t);
-      });
-    } catch {
-      // Lightweight fallback: pull headings and list items
-      const safe = String(html).replace(/\s+/g,' ');
-      const h1 = /<h1[^>]*>(.*?)<\/h1>/i.exec(safe)?.[1] || '';
-      const h2s = Array.from(safe.matchAll(/<h2[^>]*>(.*?)<\/h2>/gi)).map(m=>m[1]);
-      const h3s = Array.from(safe.matchAll(/<h3[^>]*>(.*?)<\/h3>/gi)).map(m=>m[1]);
-      const lis = Array.from(safe.matchAll(/<li[^>]*>(.*?)<\/li>/gi)).map(m=>m[1]);
-      const prices = Array.from(safe.matchAll(/\$\s?\d{1,3}(?:,\d{3})*(?:\.\d{2})?/g)).map(m=>m[0]);
-      extracted = {
-        title: h1,
-        products: [...h2s, ...h3s].slice(0, 10).map(s => s.replace(/<[^>]+>/g,'').trim()).filter(Boolean),
-        services: [],
-        prices,
-        features: lis.slice(0, 20).map(s => s.replace(/<[^>]+>/g,'').trim()).filter(Boolean)
-      };
+      $('script, style').remove();
+      content.title = $('h1').first().text() || $('title').text() || '';
+      content.description = $('meta[name="description"]').attr('content') || '';
+      content.keywords = $('meta[name="keywords"]').attr('content') || '';
+      const paragraphs = $('p').map((_: number, el: any) => $(el).text()).get().join(' ');
+      content.text = String(paragraphs).replace(/\s+/g,' ').trim().slice(0, 1000);
+    } catch (e) {
+      const safe = String(html)
+        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style[\s\S]*?<\/style>/gi, ' ');
+      const title = (/<title[^>]*>(.*?)<\/title>/i.exec(safe)?.[1] || '').replace(/<[^>]+>/g,'').trim();
+      const text = safe.replace(/<[^>]+>/g, ' ').replace(/\s+/g,' ').trim().slice(0, 1000);
+      content = { title, description:'', keywords:'', text };
     }
 
-    const rawText = String(html)
-      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 1000);
-
-    res.json({ content: extracted, rawText });
+    res.json({ content, rawText: content.text });
   } catch (error) {
-    res.json({ content: {}, rawText: '' });
+    res.json({ content: { error: 'URL not accessible' }, rawText: '' });
   }
 });
 app.post('/ig/generate-drafts', async (req, res) => {
@@ -1412,6 +1402,122 @@ app.get('/ig/history', (req, res) => {
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString(), tunnel: { url: tunnelUrl, active: !!tunnelUrl } });
+});
+
+// License endpoints
+app.get('/license/status', (_req, res) => {
+  try {
+    const lic = require('./license/validator') as typeof import('./license/validator');
+    const st = lic.getLicenseStatus();
+    res.json(st);
+  } catch (e: any) {
+    res.json({ valid: false });
+  }
+});
+
+app.post('/license/activate', (req, res) => {
+  try {
+    const { email, key } = (req.body || {}) as { email?: string; key?: string };
+    if (!email || !key) return res.status(400).json({ error: 'missing_fields' });
+    const lic = require('./license/validator') as typeof import('./license/validator');
+    const ok = lic.activateLicense(email, key);
+    if (!ok) return res.status(400).json({ error: 'invalid_license' });
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ error: 'server_error' });
+  }
+});
+
+// Settings endpoints (persist masked credentials)
+app.get('/settings', (_req, res) => {
+  try {
+    res.json({
+      igUserId: cfg.igUserId || '',
+      fbToken: cfg.fbToken ? '***' + String(cfg.fbToken).slice(-4) : '',
+      openaiKey: cfg.openaiApiKey ? '***' + String(cfg.openaiApiKey).slice(-4) : ''
+    });
+  } catch {
+    res.json({ igUserId: '', fbToken: '', openaiKey: '' });
+  }
+});
+
+app.post('/settings', (req, res) => {
+  try {
+    const { igUserId, fbToken, openaiKey } = (req.body || {}) as { igUserId?: string; fbToken?: string; openaiKey?: string };
+    if (igUserId) process.env.IG_USER_ID = String(igUserId);
+    if (fbToken) process.env.FB_LONG_LIVED_PAGE_TOKEN = String(fbToken);
+    if (openaiKey) process.env.OPENAI_API_KEY = String(openaiKey);
+
+    // Persist to settings file
+    const baseDir = process.env.BULKIG_PRO_DATA_DIR || path.join(require('os').homedir(), 'BulkIG-Pro');
+    try { if (!fs.existsSync(baseDir)) fs.mkdirSync(baseDir, { recursive: true }); } catch {}
+    const settingsPath = path.join(baseDir, 'settings.json');
+    const payload: any = {};
+    if (igUserId) payload.igUserId = igUserId;
+    if (fbToken) payload.fbToken = encrypt(String(fbToken));
+    if (openaiKey) payload.openaiKey = encrypt(String(openaiKey));
+    fs.writeFileSync(settingsPath, JSON.stringify(payload, null, 2), 'utf8');
+
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ error: 'server_error' });
+  }
+});
+
+// ==============================
+// Facebook API endpoints (Pro)
+// ==============================
+app.get('/fb/pages', async (_req, res) => {
+  try {
+    if (!cfg.fbToken) {
+      return res.status(400).json({ error: 'missing_facebook_token' });
+    }
+    const r = await fetch(`https://graph.facebook.com/v18.0/me/accounts?access_token=${encodeURIComponent(cfg.fbToken)}`);
+    const data = await r.json();
+    if (!r.ok || (data && data.error)) {
+      const msg = (data && data.error && data.error.message) || `status_${r.status}`;
+      addLog('error', `[FACEBOOK] Failed to fetch pages: ${msg}`);
+      return res.status(500).json({ error: msg });
+    }
+    const pages = Array.isArray(data.data) ? data.data : [];
+    addLog('info', `[FACEBOOK] Fetched ${pages.length} pages`);
+    res.json({ pages });
+  } catch (e: any) {
+    addLog('error', `[FACEBOOK] Failed to fetch pages: ${e?.message || e}`);
+    res.status(500).json({ error: String(e?.message || e) });
+  }
+});
+
+app.post('/fb/publish', async (req, res) => {
+  try {
+    const { caption, filename, pageId, pageAccessToken } = req.body as { caption: string; filename: string; pageId: string; pageAccessToken?: string };
+    if (!cfg.fbToken && !pageAccessToken) return res.status(400).json({ error: 'missing_facebook_token' });
+    if (!pageId) return res.status(400).json({ error: 'missing_page_id' });
+    if (!filename) return res.status(400).json({ error: 'missing_filename' });
+
+    const token = pageAccessToken || cfg.fbToken;
+    const ext = String(path.extname(filename || '')).toLowerCase();
+    const isVideo = ['.mp4', '.mov', '.avi', '.webm'].includes(ext);
+    const localUrl = `http://localhost:${cfg.port}/media/${encodeURIComponent(filename)}`;
+    const mediaUrl = tunnelUrl ? `${tunnelUrl}/media/${encodeURIComponent(filename)}` : localUrl;
+
+    const endpoint = isVideo ? `https://graph.facebook.com/v18.0/${encodeURIComponent(pageId)}/videos` : `https://graph.facebook.com/v18.0/${encodeURIComponent(pageId)}/photos`;
+    const payload = isVideo ? { file_url: mediaUrl, description: caption || '', access_token: token } : { url: mediaUrl, message: caption || '', access_token: token };
+
+    const r = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const j = await r.json();
+    if (!r.ok || (j && j.error)) {
+      const msg = (j && j.error && j.error.message) || `status_${r.status}`;
+      addLog('error', `[FACEBOOK] Publish failed: ${msg}`);
+      return res.status(500).json({ error: msg });
+    }
+
+    addLog('info', `[FACEBOOK] Published ${filename} to page ${pageId}`, { id: j.id || j.post_id }, 'SUCCESS');
+    res.json({ success: true, postId: j.id || j.post_id });
+  } catch (e: any) {
+    addLog('error', `[FACEBOOK] Publish failed: ${e?.message || e}`);
+    res.status(500).json({ error: String(e?.message || e) });
+  }
 });
 
 function startServices() {

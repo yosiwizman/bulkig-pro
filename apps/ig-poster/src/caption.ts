@@ -7,6 +7,35 @@ function ensureHashtag(s: string): string { return s.startsWith('#') ? s : ('#' 
 
 function clamp(len: number, min: number, max: number) { return Math.max(min, Math.min(max, len)); }
 
+// Improved hashtag generation: 10-15 tags with variations and related terms
+function generateHashtags(keywords: string[]): string[] {
+  const tags = new Set<string>();
+  const baseKeywords = (keywords || []).filter(Boolean);
+  for (const kw of baseKeywords) {
+    const words = String(kw).toLowerCase().split(/\s+/).filter(Boolean);
+    // Add base hashtag and variations for each word and combined
+    const combined = words.join('');
+    if (combined) {
+      tags.add(`#${combined}`);
+      tags.add(`#${combined}life`);
+      tags.add(`#${combined}love`);
+      tags.add(`#${combined}daily`);
+    }
+    for (const w of words) {
+      const clean = w.replace(/[^a-z0-9]/g, '');
+      if (!clean) continue;
+      tags.add(`#${clean}`);
+      tags.add(`#${clean}life`);
+      tags.add(`#${clean}daily`);
+    }
+    // Removed brand/location anchors to keep captions generic
+  }
+  // Pad with defaults up to 15
+  const defaults = ['#instagood','#photooftheday','#love','#beautiful','#happy','#cute','#instadaily','#followme','#picoftheday','#instalike'];
+  for (const d of defaults) { if (tags.size >= 15) break; tags.add(d); }
+  return Array.from(tags).slice(0, 15);
+}
+
 // Filter out unwanted filename patterns from captions
 function filterFilenameWords(words: string[]): string[] {
   return words.filter(word => {
@@ -41,13 +70,10 @@ export function generateSmartCaption(filename: string, mediaType: MediaType, sel
       ];
   const hook = tone[Math.floor(Math.random() * tone.length)];
 
-  let hashtags = (selectedKeywords && selectedKeywords.length ? selectedKeywords : pickDefaultKeywords(8))
-    .map(ensureHashtag);
-  // Dedup and trim to ~10-12 tags max
-  const seen = new Set<string>();
-  hashtags = hashtags.filter(h => { const k = h.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 12);
+  const seed = (selectedKeywords && selectedKeywords.length ? selectedKeywords : pickDefaultKeywords(8));
+  let hashtags = generateHashtags(seed);
 
-  const core = `Live Pilates USA · Miami — ${hook}.`;
+  const core = `Your brand — ${hook}.`;
   const detail = nouns.length ? ` Today we focus on ${nouns.join(', ')}.` : '';
   const cta = mediaType === 'video'
     ? ' Press play and flow with us.'
@@ -72,33 +98,33 @@ export function generateBatchCaptions(count: number, style: 'short' | 'medium' |
   
   const baseHooks = {
     short: [
-      'Pilates power!',
-      'Find your flow.',
-      'Core strength.',
-      'Mind-body connection.',
-      'Pilates precision.'
+      'New post!',
+      'Quick tip.',
+      'Behind the scenes.',
+      'Today’s highlight.',
+      'Fresh inspiration.'
     ],
     medium: [
-      'Feel the flow in every rep.',
-      'Strong posture, calm mind.',
-      'Move with intention and energy.',
-      'Precision and control in every line.',
-      'Breathe, align, and power up your core.',
-      'Find balance and length through mindful movement.'
+      'Sharing a quick update.',
+      'Here’s something new.',
+      'Tips and insights for you.',
+      'Behind the scenes today.',
+      'What do you think?',
+      'Let’s make something great.'
     ],
     long: [
-      'Experience the transformative power of Pilates with every mindful movement.',
-      'Discover strength, flexibility, and balance through precision-based training.',
-      'Connect with your core and unlock your body\'s potential through focused movement.',
-      'Build lasting strength and stability with time-tested Pilates principles.',
-      'Transform your body and mind through the art of controlled movement.'
+      'Here’s a deeper dive into today’s topic.',
+      'Thoughts, ideas, and a few takeaways.',
+      'Exploring something new with you.',
+      'A story worth sharing for your audience.',
+      'Let’s connect and create together.'
     ]
   };
   
   const ctaOptions = {
-    short: [' Join us!', ' Try it today.', ' Book now.'],
-    medium: [' Save this for your next session.', ' Ready to transform?', ' Experience the difference.'],
-    long: [' Ready to experience the Live Pilates USA difference?', ' Book your session and feel the transformation.', ' Join our community of movement enthusiasts.']
+    short: [' Join us!', ' Try it today.', ' Learn more.'],
+    medium: [' Save this for later.', ' Ready to dive in?', ' Experience the difference.'],
+    long: [' Ready to learn more?', ' Let’s get started.', ' Join our community.']
   };
   
   const hooks = baseHooks[style];
@@ -111,10 +137,9 @@ export function generateBatchCaptions(count: number, style: 'short' | 'medium' |
     const hook = hooks[Math.floor(Math.random() * hooks.length)];
     const cta = ctas[Math.floor(Math.random() * ctas.length)];
     
-    let hashtags = (keywords && keywords.length ? keywords : pickDefaultKeywords(8))
-      .map(ensureHashtag);
-    // Always include brand/location anchors
-    hashtags = [...hashtags, '#LivePilatesUSA', '#Miami', '#Florida'];
+    const seed = (keywords && keywords.length ? keywords : pickDefaultKeywords(8));
+    let hashtags = generateHashtags(seed);
+    // Keep hashtags brand-agnostic (no hardcoded anchors)
 
     // If urlContent is present, enrich tags with common terms
     if (urlContent) {
@@ -151,13 +176,13 @@ export function generateBatchCaptions(count: number, style: 'short' | 'medium' |
     
     switch (style) {
       case 'short':
-        caption = `Live Pilates USA · ${hook}${cta}`.trim();
+        caption = `${hook}${cta}`.trim();
         break;
       case 'medium':
-        caption = `Live Pilates USA · Miami — ${hook}${cta} Strength, flexibility, and mindful control.`.trim();
+        caption = `${hook}${cta} Sharing ideas and inspiration.`.trim();
         break;
       case 'long':
-        caption = `Live Pilates USA · Miami — ${hook} Our expertly designed programs blend traditional techniques with modern innovation to deliver results that go beyond the studio.${cta}`.trim();
+        caption = `${hook} ${cta} Let’s create something great together.`.trim();
         break;
     }
     

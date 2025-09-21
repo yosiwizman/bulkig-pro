@@ -125,7 +125,7 @@ Videos require special handling due to Instagram's processing requirements:
 - FFprobe integration for metadata extraction
 
 ### Caption Generation
-Smart caption system with Live Pilates USA branding:
+Smart caption system (brand-agnostic):
 - Keyword-based templates for consistent messaging
 - Hashtag optimization and character limits
 - Media type-specific caption variations
