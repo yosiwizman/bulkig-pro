@@ -1,0 +1,22 @@
+[CONFIG] Mock mode: true
+[CONFIG] Inbox path: C:\Users\yosiw\BulkIG-Pro\inbox
+[CONFIG] Server port: 4011
+
+============================================================
+[CONFIG] Instagram Posting Mode: MOCK (Test Mode)
+[CONFIG] ⚠️  Mock mode - Posts will not be published to Instagram
+============================================================
+
+==================================================
+🚀 BulkIG Starting...
+==================================================
+[WATCHER] Starting file watcher on: C:\Users\yosiw\BulkIG-Pro\inbox
+[PUBLISHER] Starting publish loop
+✅ Server running on http://localhost:4011
+📁 Watching: C:\Users\yosiw\BulkIG-Pro\inbox
+🖼️  Static server: http://localhost:5006
+🎯 Mock mode: ON
+==================================================
+[TUNNEL] Starting Cloudflare tunnel (attempt 1/3)...
+[TUNNEL] cloudflared binary missing; installing...
+[TUNNEL] cloudflared installed to: C:\Users\yosiw\Desktop\bulkig-pro\node_modules\cloudflared\bin\cloudflared.exe

@@ -3,8 +3,14 @@ import path from 'path';
 import fs from 'fs';
 import { spawn, type ChildProcess } from 'child_process';
 import fetch from 'node-fetch';
-import { autoUpdater } from 'electron-updater';
 import { decrypt } from '../secure';
+
+// FIX: Prevent multiple instances (fixes 20+ process bug)
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+  process.exit(0);
+}
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -147,7 +153,7 @@ async function bootstrap() {
   if (!ok) console.warn('[ELECTRON] Server did not respond in time');
   createWindow();
   try { createTray(); } catch (e) { console.warn('[ELECTRON] Tray init failed:', (e as any)?.message || e); }
-  try { autoUpdater.checkForUpdatesAndNotify().catch(()=>{}); } catch {}
+  // Auto-updater removed to prevent EPIPE crashes
 }
 
 app.on('ready', bootstrap);
@@ -167,4 +173,13 @@ app.on('window-all-closed', () => {
 
 app.on('activate', () => {
   if (mainWindow === null) createWindow();
+});
+
+// Handle second instance attempt
+app.on('second-instance', () => {
+  // If someone tries to run a second instance, focus our window instead
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
 });
