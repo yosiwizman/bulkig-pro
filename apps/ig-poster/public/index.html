@@ -1450,8 +1450,11 @@
         </div>
         <div class="settings-section" style="margin-bottom:16px;">
           <h3>AI Configuration</h3>
-          <label>OpenAI API Key:</label>
-          <input type="password" id="openaiKey" placeholder="sk-..." style="width:100%; padding:8px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;">
+<label>OpenAI API Key:</label>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <input type="password" id="openaiKey" placeholder="sk-..." style="flex:1; padding:8px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;">
+            <button id="btnVerifyOpenAI" class="secondary" title="Verify API key by calling OpenAI">Verify</button>
+          </div>
         </div>
         <div style="display:flex; gap:8px; justify-content:flex-end;">
           <button class="secondary" onclick="closeSettings()">Cancel</button>
@@ -1466,6 +1469,23 @@
     function openSettings(){ try { (async ()=>{ const r = await fetch('/settings'); const s = await r.json(); const m = document.getElementById('settingsModal'); if (document.getElementById('igUserId')) document.getElementById('igUserId').value = s.igUserId || ''; if (document.getElementById('fbToken')) document.getElementById('fbToken').value = ''; if (document.getElementById('openaiKey')) document.getElementById('openaiKey').value = ''; if (m) m.style.display='flex'; })(); } catch {} }
     function closeSettings(){ const m = document.getElementById('settingsModal'); if (m) m.style.display='none'; }
     async function saveSettings(){ try { const igUserId = (document.getElementById('igUserId')||{}).value||''; const fbToken = (document.getElementById('fbToken')||{}).value||''; const openaiKey = (document.getElementById('openaiKey')||{}).value||''; await fetch('/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ igUserId, fbToken, openaiKey }) }); showToast('success','Settings saved'); closeSettings(); } catch(e){ showToast('error','Save failed: ' + (e && e.message || '')); } }
+
+    // Verify OpenAI key
+    async function verifyOpenAI(){
+      const btn = document.getElementById('btnVerifyOpenAI');
+      const key = (document.getElementById('openaiKey')||{}).value||'';
+      if (btn) { btn.disabled = true; btn.textContent = 'Verifying...'; }
+      try {
+        const r = await fetch('/verify-openai', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ key }) });
+        if (!r.ok) {
+          const t = await r.json().catch(()=>({error:'failed'}));
+          showToast('error', 'OpenAI verify: ' + (t.error || 'failed'));
+        } else {
+          showToast('success', 'OpenAI key verified');
+        }
+      } catch(e){ showToast('error','Network error verifying key'); }
+      finally { if (btn) { btn.disabled = false; btn.textContent = 'Verify'; } }
+    }
 
     // Modal functions
     function openModal(modalId) {
@@ -2168,6 +2188,7 @@
     
     // Attach analyze button event listener
     document.getElementById('btnAnalyzeUrl')?.addEventListener('click', analyzeUrl);
+    document.getElementById('btnVerifyOpenAI')?.addEventListener('click', verifyOpenAI);
     
     const btnViewDrafts = document.getElementById('btnViewDrafts');
     if (btnViewDrafts) btnViewDrafts.addEventListener('click', async () => {

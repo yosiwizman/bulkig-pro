@@ -1494,6 +1494,38 @@ app.post('/settings', (req, res) => {
   }
 });
 
+// Verify OpenAI API key
+app.post('/verify-openai', async (req, res) => {
+  try {
+    const body = (req.body || {}) as { key?: string };
+    const key = String(body.key || process.env.OPENAI_API_KEY || '').trim();
+    if (!key) return res.status(400).json({ ok: false, error: 'missing_key' });
+
+    const r = await fetch('https://api.openai.com/v1/models?limit=1', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${key}`,
+      } as any,
+    }).catch((e:any) => ({ ok: false, status: 0, _e: e } as any));
+
+    if ((r as any)._e) {
+      addLog('warn', '[OPENAI] Verification network error');
+      return res.status(502).json({ ok: false, error: 'network_error' });
+    }
+
+    if (!r.ok) {
+      const status = r.status || 0;
+      addLog('warn', '[OPENAI] Verification failed', { status });
+      return res.status(status === 401 ? 401 : 400).json({ ok: false, error: status === 401 ? 'unauthorized' : `status_${status}` });
+    }
+
+    addLog('info', '[OPENAI] API key verified', undefined, 'SUCCESS');
+    res.json({ ok: true });
+  } catch (e:any) {
+    res.status(500).json({ ok: false, error: 'server_error' });
+  }
+});
+
 // ==============================
 // Facebook API endpoints (Pro)
 // ==============================
