@@ -747,7 +747,12 @@
             <button class="draft-filter-btn" data-filter="assigned" style="background:transparent; color:#94a3b8; border:1px solid #1e2a44; border-radius:6px; padding:6px 10px; cursor:pointer;">Assigned</button>
             <button class="draft-filter-btn" data-filter="used" style="background:transparent; color:#94a3b8; border:1px solid #1e2a44; border-radius:6px; padding:6px 10px; cursor:pointer;">Used</button>
           </div>
-          <div style="margin-left: auto; display:flex; gap:8px; align-items:center;">
+          <div style="margin-left: auto; display:flex; gap:12px; align-items:center;">
+            <label class="row" style="gap:6px; align-items:center;">
+              <input id="chkDraftsSelectAll" type="checkbox"> Select All
+            </label>
+            <span class="muted" id="draftsSelectedInfo">0 selected</span>
+            <button id="btnDraftsDeleteSel" class="secondary" disabled>Delete Selected</button>
             <span style="color:#94a3b8; font-size:13px;">Created:</span>
             <select id="dateFilter" style="background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:4px; padding:4px 8px; font-size:12px;">
               <option value="all">All time</option>
@@ -2199,6 +2204,9 @@
       openModal('draftsManager');
     });
 
+    let selectedDraftsSet = new Set();
+    let lastRenderedDraftIds = [];
+
     function renderDraftsGrid() {
       const root = document.getElementById('draftsGrid'); if (!root) return; root.innerHTML = '';
       
@@ -2232,12 +2240,14 @@
         root.innerHTML = `<div class="muted" style="text-align:center; padding: 20px;">No ${label} drafts${dateLabel}.</div>`;
         return;
       }
+      lastRenderedDraftIds = list.map(d => d.id);
       list.forEach((draft, index) => {
         const card = document.createElement('div');
         card.style.cssText = 'background:#121c30; border:1px solid #1e2a44; border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:8px;';
         card.dataset.id = draft.id;
         card.innerHTML = `
           <div style=\"display:flex; justify-content:space-between; align-items:center;\">
+            <label style=\"display:flex; align-items:center; gap:6px;\"><input type=\"checkbox\" class=\"chkDraftSel\" data-id=\"${draft.id}\" ${selectedDraftsSet.has(draft.id)?'checked':''}> <span class=\"muted\" style=\"font-size:12px;\">Select</span></label>
             <div class=\"draft-number\" style=\"color:#94a3b8; font-size:12px;\">#${index + 1} · <span style=\"text-transform:capitalize\">${draft.style}</span> · <span class=\"badge ${draft.status.toUpperCase()}\">${draft.status}</span></div>
             <div class=\"muted\" style=\"font-size:11px;\">${new Date(draft.createdAt).toLocaleString()}</div>
           </div>
@@ -2305,6 +2315,14 @@
         });
       });
 
+      root.querySelectorAll('.chkDraftSel').forEach(chk => {
+        chk.addEventListener('change', () => {
+          const id = chk.getAttribute('data-id');
+          if (chk.checked) selectedDraftsSet.add(id); else selectedDraftsSet.delete(id);
+          updateDraftsBulkUI();
+        });
+      });
+
       root.querySelectorAll('.btnDeleteDraft').forEach(btn => {
         btn.addEventListener('click', async () => {
           try {
@@ -2366,6 +2384,42 @@
         updateUpcSelectedInfo(upcAll.length);
       });
     }
+
+    function updateDraftsBulkUI(){
+      const info = document.getElementById('draftsSelectedInfo');
+      const btn = document.getElementById('btnDraftsDeleteSel');
+      const chkAll = document.getElementById('chkDraftsSelectAll');
+      if (info) info.textContent = `${selectedDraftsSet.size} selected`;
+      if (btn) btn.disabled = selectedDraftsSet.size === 0;
+      if (chkAll) {
+        // Set checked if all currently rendered are selected
+        const allSelected = lastRenderedDraftIds.length > 0 && lastRenderedDraftIds.every(id => selectedDraftsSet.has(id));
+        chkAll.checked = allSelected;
+      }
+    }
+
+    document.getElementById('chkDraftsSelectAll')?.addEventListener('change', (e) => {
+      const checked = e.target.checked;
+      if (checked) lastRenderedDraftIds.forEach(id => selectedDraftsSet.add(id));
+      else lastRenderedDraftIds.forEach(id => selectedDraftsSet.delete(id));
+      // Re-render to reflect checkbox states
+      renderDraftsGrid();
+      updateDraftsBulkUI();
+    });
+
+    document.getElementById('btnDraftsDeleteSel')?.addEventListener('click', async () => {
+      try {
+        if (selectedDraftsSet.size === 0) return;
+        if (!confirm(`Delete ${selectedDraftsSet.size} selected drafts?`)) return;
+        const ids = Array.from(selectedDraftsSet);
+        await fetchJSON('/ig/caption-drafts/bulk-delete', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ ids }) });
+        selectedDraftsSet.clear();
+        await loadDrafts('all');
+        renderDraftsGrid();
+        updateDraftsBulkUI();
+        showToast('success', 'Deleted selected drafts');
+      } catch(e){ showToast('error', 'Bulk delete failed: ' + e.message); }
+    });
     
     // Remove selected handler
     const btnRemoveSel = document.getElementById('btnUpcRemoveSel');
