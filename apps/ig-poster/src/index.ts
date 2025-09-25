@@ -1438,15 +1438,31 @@ app.post('/license/activate', (req, res) => {
   }
 });
 
-// Settings endpoints (persist masked credentials)
+// Settings endpoints
 app.get('/settings', (_req, res) => {
   try {
-    res.json({
-      igUserId: cfg.igUserId || '',
-      fbToken: cfg.fbToken ? '***' + String(cfg.fbToken).slice(-4) : '',
-      openaiKey: cfg.openaiApiKey ? '***' + String(cfg.openaiApiKey).slice(-4) : ''
-    });
-  } catch {
+    const baseDir = process.env.BULKIG_PRO_DATA_DIR || path.join(require('os').homedir(), 'BulkIG-Pro');
+    const settingsPath = path.join(baseDir, 'settings.json');
+    let fileIg = '', fileFb = '', fileAi = '';
+    try {
+      if (fs.existsSync(settingsPath)) {
+        const raw = fs.readFileSync(settingsPath, 'utf8');
+        const j = JSON.parse(raw || '{}');
+        if (j.igUserId) fileIg = String(j.igUserId);
+        if (j.fbToken) { try { fileFb = decrypt(String(j.fbToken)); } catch {} }
+        if (j.openaiKey) { try { fileAi = decrypt(String(j.openaiKey)); } catch {} }
+      }
+    } catch {}
+
+    const out = {
+      igUserId: fileIg || cfg.igUserId || '',
+      fbToken: (fileFb || cfg.fbToken) ? '***' + String(fileFb || cfg.fbToken).slice(-4) : '',
+      openaiKey: (fileAi || cfg.openaiApiKey) ? '***' + String(fileAi || cfg.openaiApiKey).slice(-4) : ''
+    };
+    console.log('[SETTINGS][GET] returning masked settings from', settingsPath);
+    res.json(out);
+  } catch (e:any) {
+    console.warn('[SETTINGS][GET] failed:', e?.message || e);
     res.json({ igUserId: '', fbToken: '', openaiKey: '' });
   }
 });
@@ -1454,22 +1470,26 @@ app.get('/settings', (_req, res) => {
 app.post('/settings', (req, res) => {
   try {
     const { igUserId, fbToken, openaiKey } = (req.body || {}) as { igUserId?: string; fbToken?: string; openaiKey?: string };
-    if (igUserId) process.env.IG_USER_ID = String(igUserId);
-    if (fbToken) process.env.FB_LONG_LIVED_PAGE_TOKEN = String(fbToken);
-    if (openaiKey) process.env.OPENAI_API_KEY = String(openaiKey);
-
-    // Persist to settings file
     const baseDir = process.env.BULKIG_PRO_DATA_DIR || path.join(require('os').homedir(), 'BulkIG-Pro');
     try { if (!fs.existsSync(baseDir)) fs.mkdirSync(baseDir, { recursive: true }); } catch {}
     const settingsPath = path.join(baseDir, 'settings.json');
-    const payload: any = {};
-    if (igUserId) payload.igUserId = igUserId;
-    if (fbToken) payload.fbToken = encrypt(String(fbToken));
-    if (openaiKey) payload.openaiKey = encrypt(String(openaiKey));
-    fs.writeFileSync(settingsPath, JSON.stringify(payload, null, 2), 'utf8');
 
-    res.json({ success: true });
+    // Merge with existing
+    let existing: any = {};
+    try { if (fs.existsSync(settingsPath)) existing = JSON.parse(fs.readFileSync(settingsPath, 'utf8') || '{}'); } catch {}
+
+    const payload: any = { ...existing };
+    if (igUserId !== undefined) { payload.igUserId = igUserId; process.env.IG_USER_ID = String(igUserId || ''); }
+    if (fbToken) { payload.fbToken = encrypt(String(fbToken)); process.env.FB_LONG_LIVED_PAGE_TOKEN = String(fbToken); }
+    if (openaiKey) { payload.openaiKey = encrypt(String(openaiKey)); process.env.OPENAI_API_KEY = String(openaiKey); }
+
+    fs.writeFileSync(settingsPath, JSON.stringify(payload, null, 2), 'utf8');
+    console.log('[SETTINGS][POST] saved to', settingsPath, { ig: !!igUserId, fb: !!fbToken, ai: !!openaiKey });
+    addLog('info', '[SETTINGS] Saved settings', { setIg: !!igUserId, setFb: !!fbToken, setOpenAI: !!openaiKey });
+
+    res.json({ success: true, path: settingsPath });
   } catch (e: any) {
+    console.error('[SETTINGS][POST] error', e?.message || e);
     res.status(500).json({ error: 'server_error' });
   }
 });
