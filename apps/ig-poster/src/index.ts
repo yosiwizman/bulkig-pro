@@ -1015,6 +1015,25 @@ app.delete('/ig/caption-drafts/:id', (req, res) => {
   }
 });
 
+// Bulk delete drafts
+app.post('/ig/caption-drafts/bulk-delete', (req, res) => {
+  try {
+    const ids = Array.isArray((req.body||{}).ids) ? (req.body as any).ids.map((x:any)=> String(x)) : [];
+    if (!ids.length) return res.status(400).json({ success:false, error:'empty_ids' });
+    const before = captionDrafts.length;
+    for (const id of ids) {
+      const idx = captionDrafts.findIndex(x => x.id === id);
+      if (idx >= 0) captionDrafts.splice(idx, 1);
+    }
+    saveDraftsToFile();
+    const removed = before - captionDrafts.length;
+    addLog('info', `[DRAFTS] Bulk delete`, { removed, requested: ids.length });
+    res.json({ success:true, removed });
+  } catch (e:any) {
+    res.status(500).json({ success:false, error:'server_error' });
+  }
+});
+
 app.post('/ig/caption-drafts/:id/assign', (req, res) => {
   try {
     const id = String(req.params.id || '');
