@@ -10,15 +10,31 @@ import ffprobe from 'ffprobe-static';
 import fetch from 'node-fetch';
 import { cfg } from './env';
 import { encrypt, decrypt } from './secure';
+import { spawn } from 'child_process';
 
 // Use dynamic import for ESM-only execa to avoid CJS require issues in production
 let execaDynamic: any;
-async function execaRun(cmd: string, args: string[], opts?: any) {
-  if (!execaDynamic) {
-    const m: any = await import('execa');
-    execaDynamic = m?.execa || m?.default || m;
+async function execaRun(cmd: string, args: string[], opts?: any): Promise<{ stdout: string }> {
+  try {
+    if (!execaDynamic) {
+      const m: any = await import('execa');
+      execaDynamic = m?.execa || m?.default || m;
+    }
+    return await execaDynamic(cmd, args, opts);
+  } catch {
+    // Fallback to native spawn if execa not available
+    return new Promise((resolve, reject) => {
+      const child = spawn(cmd, args, { shell: false, windowsHide: true });
+      let out = '';
+      let err = '';
+      child.stdout?.on('data', (b) => { out += b.toString(); });
+      child.stderr?.on('data', (b) => { err += b.toString(); });
+      child.on('error', (e) => reject(e));
+      child.on('close', (code) => {
+        if (code === 0) resolve({ stdout: out }); else reject(new Error(err || `exit_${code}`));
+      });
+    });
   }
-  return execaDynamic(cmd, args, opts);
 }
 
 // Cloudflare tunnel (dynamic import via require to avoid TS type issues)
