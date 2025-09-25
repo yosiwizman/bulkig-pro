@@ -1,8 +1,7 @@
-import * as dotenv from 'dotenv';
 import path from 'path';
 import os from 'os';
-// Load .env from repo root (three levels up from src): apps/ig-poster/src -> apps/ig-poster -> apps -> repo root
-dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+// Load .env from repo root if dotenv is available; ignore if missing in production
+try { require('dotenv').config({ path: path.resolve(__dirname, '../../../.env') }); } catch {}
 
 const defaultInbox = path.join(os.homedir(), 'BulkIG-Pro', 'inbox');
 

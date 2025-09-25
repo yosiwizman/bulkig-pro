@@ -73,18 +73,34 @@ function startServer() {
       windowsHide: true,
     });
   } else {
-    // Spawn compiled server for production (from packaged app resources)
+    // Spawn compiled server for production as pure Node using Electron's embedded Node runtime
     const appPath = app.getAppPath();
     const serverEntry = path.resolve(appPath, 'apps', 'ig-poster', 'dist', 'index.js');
-    // Use fork to run as a Node child without launching a new Electron window
-    serverProcess = spawn(process.execPath, [serverEntry, '--no-sandbox'], {
-      env,
-      stdio: 'inherit',
+
+    // Minimal persistent logging for diagnostics
+    const { root } = getAppDataRoot();
+    const outLog = path.join(root, 'server.log');
+    try { fs.appendFileSync(outLog, `\n[BOOT] ${new Date().toISOString()} launching: ${serverEntry}\n`); } catch {}
+
+    // Ensure the child is Node-only (no Electron app, avoids single-instance lock conflicts)
+    const envNode = Object.assign({}, env, { ELECTRON_RUN_AS_NODE: '1' });
+
+    serverProcess = spawn(process.execPath, [serverEntry], {
+      env: envNode,
+      stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
     });
+
+    // Pipe logs to file (best-effort)
+    serverProcess.stdout?.on('data', (b) => { try { fs.appendFileSync(outLog, b); } catch {} });
+    serverProcess.stderr?.on('data', (b) => { try { fs.appendFileSync(outLog, b); } catch {} });
   }
   serverProcess.on('exit', (code) => {
     console.log('[SERVER] exited with code', code);
+    try {
+      const { root } = getAppDataRoot();
+      fs.appendFileSync(path.join(root, 'server.log'), `\n[EXIT] ${new Date().toISOString()} code=${code}\n`);
+    } catch {}
     serverProcess = null;
   });
 }

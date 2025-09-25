@@ -6,11 +6,21 @@ import multer from 'multer';
 import fs from 'fs';
 import mime from 'mime-types';
 import os from 'os';
-import { execa } from 'execa';
 import ffprobe from 'ffprobe-static';
 import fetch from 'node-fetch';
 import { cfg } from './env';
 import { encrypt, decrypt } from './secure';
+
+// Use dynamic import for ESM-only execa to avoid CJS require issues in production
+let execaDynamic: any;
+async function execaRun(cmd: string, args: string[], opts?: any) {
+  if (!execaDynamic) {
+    const m: any = await import('execa');
+    execaDynamic = m?.execa || m?.default || m;
+  }
+  return execaDynamic(cmd, args, opts);
+}
+
 // Cloudflare tunnel (dynamic import via require to avoid TS type issues)
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const cloudflaredLib: any = require('cloudflared');
@@ -1630,7 +1640,7 @@ function percentile(arr: number[], p: number): number {
 
 async function probeVideo(filePath: string): Promise<{durationSec:number, width:number, height:number}> {
   const args = ['-v','error','-print_format','json','-show_entries','format=duration:stream=index,codec_type,width,height',filePath];
-  const { stdout } = await execa(ffprobe.path, args, { timeout: 20000 });
+  const { stdout } = await execaRun(ffprobe.path, args, { timeout: 20000 });
   const j = JSON.parse(stdout);
   const durationSec = parseFloat(j?.format?.duration || '0');
   const vstream = (j?.streams||[]).find((s:any)=> s.codec_type==='video');
@@ -1655,7 +1665,7 @@ async function checkFilesystemHealth(inbox: string): Promise<{ exists:boolean; w
     if (os.platform() === 'win32') {
       const drive = String(inbox).slice(0,2).toUpperCase();
       out.disk.drive = drive;
-      const { stdout } = await execa('wmic', ['logicaldisk', 'where', `DeviceID='${drive}'`, 'get', 'FreeSpace,Size', '/format:value']);
+      const { stdout } = await execaRun('wmic', ['logicaldisk', 'where', `DeviceID='${drive}'`, 'get', 'FreeSpace,Size', '/format:value']);
       // Parse FreeSpace=..., Size=...
       const mFree = stdout.match(/FreeSpace=(\d+)/i);
       const mSize = stdout.match(/Size=(\d+)/i);
