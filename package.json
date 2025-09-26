@@ -81,8 +81,18 @@
       "apps/ig-poster/dist/**",
       "apps/ig-poster/public/**",
       "node_modules/**",
-      "package.json"
-    ]
+      "package.json",
+      "assets/**"
+    ],
+    "win": {
+      "icon": "assets/icon.png"
+    },
+    "mac": {
+      "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "icon": "assets/icon.png"
+    }
   },
   "devDependencies": {
     "@types/jest": "^29.0.0",

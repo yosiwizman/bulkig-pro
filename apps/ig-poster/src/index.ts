@@ -1519,8 +1519,9 @@ app.post('/settings', (req, res) => {
     if (openaiKey) { payload.openaiKey = encrypt(String(openaiKey)); process.env.OPENAI_API_KEY = String(openaiKey); }
 
     fs.writeFileSync(settingsPath, JSON.stringify(payload, null, 2), 'utf8');
-    console.log('[SETTINGS][POST] saved to', settingsPath, { ig: !!igUserId, fb: !!fbToken, ai: !!openaiKey });
-    addLog('info', '[SETTINGS] Saved settings', { setIg: !!igUserId, setFb: !!fbToken, setOpenAI: !!openaiKey });
+    const dbg = { ig: !!igUserId, fb: !!fbToken, ai: !!openaiKey, file: settingsPath };
+    console.log('[SETTINGS][POST] saved', dbg);
+    addLog('info', '[SETTINGS] Saved settings', dbg);
 
     res.json({ success: true, path: settingsPath });
   } catch (e: any) {

@@ -1471,9 +1471,14 @@
 
   <script>
     // Settings helpers
-    function openSettings(){ try { (async ()=>{ const r = await fetch('/settings'); const s = await r.json(); const m = document.getElementById('settingsModal'); if (document.getElementById('igUserId')) document.getElementById('igUserId').value = s.igUserId || ''; if (document.getElementById('fbToken')) document.getElementById('fbToken').value = ''; if (document.getElementById('openaiKey')) document.getElementById('openaiKey').value = ''; if (m) m.style.display='flex'; })(); } catch {} }
+    function openSettings(){ try { (async ()=>{ console.log('[UI][SETTINGS] opening...'); const r = await fetch('/settings'); const s = await r.json(); console.log('[UI][SETTINGS] loaded', s); const m = document.getElementById('settingsModal'); const ig = document.getElementById('igUserId'); const fb = document.getElementById('fbToken'); const ai = document.getElementById('openaiKey'); if (ig) ig.value = s.igUserId || ''; if (fb) { fb.value = s.fbToken || ''; fb.dataset.masked = fb.value.startsWith('***') ? '1' : ''; fb.addEventListener('input', ()=>{ delete fb.dataset.masked; }); } if (ai) { ai.value = s.openaiKey || ''; ai.dataset.masked = ai.value.startsWith('***') ? '1' : ''; ai.addEventListener('input', ()=>{ delete ai.dataset.masked; }); } if (m) m.style.display='flex'; })(); } catch (e) { console.warn('[UI][SETTINGS] open failed', e); } }
     function closeSettings(){ const m = document.getElementById('settingsModal'); if (m) m.style.display='none'; }
-    async function saveSettings(){ try { const igUserId = (document.getElementById('igUserId')||{}).value||''; const fbToken = (document.getElementById('fbToken')||{}).value||''; const openaiKey = (document.getElementById('openaiKey')||{}).value||''; await fetch('/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ igUserId, fbToken, openaiKey }) }); showToast('success','Settings saved'); closeSettings(); } catch(e){ showToast('error','Save failed: ' + (e && e.message || '')); } }
+    async function saveSettings(){ try { const igUserId = (document.getElementById('igUserId')||{}).value||''; const fbEl = (document.getElementById('fbToken')||{}); const aiEl = (document.getElementById('openaiKey')||{}); const fbTokenRaw = fbEl.value||''; const openaiKeyRaw = aiEl.value||''; const payload = { igUserId };
+      // Only include tokens if user actually entered/changed them
+      if (fbTokenRaw && !(fbEl.dataset && fbEl.dataset.masked === '1') && !fbTokenRaw.startsWith('***')) payload.fbToken = fbTokenRaw;
+      if (openaiKeyRaw && !(aiEl.dataset && aiEl.dataset.masked === '1') && !openaiKeyRaw.startsWith('***')) payload.openaiKey = openaiKeyRaw;
+      console.log('[UI][SETTINGS] saving', { hasIg: !!igUserId, hasFb: !!payload.fbToken, hasAi: !!payload.openaiKey });
+      await fetch('/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) }); showToast('success','Settings saved'); closeSettings(); } catch(e){ console.error('[UI][SETTINGS] save failed', e); showToast('error','Save failed: ' + (e && e.message || '')); } }
 
     // Verify OpenAI key
     async function verifyOpenAI(){
