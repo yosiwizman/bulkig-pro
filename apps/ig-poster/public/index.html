@@ -1453,7 +1453,7 @@
 <label style="margin-top:8px; display:block;">Page Access Token (works for both Instagram & Facebook):</label>
           <div style="position:relative;">
             <textarea id="fbToken" rows="3" placeholder="Paste your Meta token here (or leave empty to keep existing)" style="width:100%; padding:8px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;"></textarea>
-            <div id="fbTokenStatus" style="position:absolute; top:8px; right:8px; padding:4px 8px; background:#22c55e; color:white; border-radius:4px; font-size:11px; font-weight:500; display:none;">✓ Token Saved</div>
+            <div id="fbTokenStatus" style="position:absolute; top:8px; right:8px; padding:4px 8px; background:#22c55e; color:white; border-radius:4px; font-size:11px; font-weight:500; display:none; pointer-events:none; user-select:none;">✓ Saved</div>
           </div>
           <div id="fbTokenHint" class="muted" style="font-size:11px; margin-top:4px;"></div>
         </div>
@@ -1465,7 +1465,7 @@
               <input type="password" id="openaiKey" placeholder="Paste your OpenAI key here (or leave empty to keep existing)" style="flex:1; padding:8px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;">
               <button id="btnVerifyOpenAI" class="secondary" title="Verify API key by calling OpenAI">Verify</button>
             </div>
-            <div id="openaiKeyStatus" style="position:absolute; top:8px; right:100px; padding:4px 8px; background:#22c55e; color:white; border-radius:4px; font-size:11px; font-weight:500; display:none;">✓ Key Saved</div>
+            <div id="openaiKeyStatus" style="position:absolute; top:8px; right:100px; padding:4px 8px; background:#22c55e; color:white; border-radius:4px; font-size:11px; font-weight:500; display:none; pointer-events:none; user-select:none;">✓ Saved</div>
           </div>
           <div id="openaiKeyHint" class="muted" style="font-size:11px; margin-top:4px;"></div>
         </div>
@@ -1487,25 +1487,37 @@
       if (fb) { 
         // Check if it's a masked value (starts with ***)
         if (s.fbToken && s.fbToken.startsWith('***')) {
-          fb.value = ''; // Keep empty - user will see the hint below
-          fb.placeholder = 'Enter new token or keep empty to use existing';
+          // Show asterisks to indicate a saved token exists
+          fb.value = '********************************'; 
+          fb.placeholder = 'Enter new token to replace existing';
+          // Store that this is a placeholder value
+          fb.dataset.isPlaceholder = 'true';
         } else if (s.fbToken) {
           fb.value = s.fbToken; // Only set if it's NOT masked
+          fb.dataset.isPlaceholder = 'false';
         } else {
           fb.value = '';
+          fb.placeholder = 'Paste your Meta token here';
+          fb.dataset.isPlaceholder = 'false';
         }
       } 
       if (ai) { 
         // Check if it's a masked value (starts with ***)
         if (s.openaiKey && s.openaiKey.startsWith('***')) {
-          ai.value = ''; // Keep empty - user will see the hint below
-          ai.placeholder = 'Enter new key or keep empty to use existing';
+          // Show asterisks to indicate a saved key exists
+          ai.value = '********************************';
+          ai.placeholder = 'Enter new key to replace existing';
+          // Store that this is a placeholder value
+          ai.dataset.isPlaceholder = 'true';
         } else if (s.openaiKey) {
           ai.value = s.openaiKey; // Only set if it's NOT masked
+          ai.dataset.isPlaceholder = 'false';
         } else {
           ai.value = '';
+          ai.placeholder = 'Paste your OpenAI key here (sk-...)';
+          ai.dataset.isPlaceholder = 'false';
         }
-      } 
+      }
       // Show the hints with last 4 digits
       const fbHint = document.getElementById('fbTokenHint'); 
       const aiHint = document.getElementById('openaiKeyHint');
@@ -1527,6 +1539,41 @@
         aiHint.innerHTML = '<span style="color:#ef4444;">⚠️ No API key saved yet</span> • Please enter your OpenAI key';
         if (aiStatus) aiStatus.style.display = 'none';
       }
+      // Add event handlers to clear asterisks when user clicks to type
+      if (fb) {
+        fb.addEventListener('focus', function() {
+          if (this.dataset.isPlaceholder === 'true') {
+            this.value = '';
+            this.dataset.isPlaceholder = 'false';
+            this.placeholder = 'Paste your new Meta token here';
+          }
+        });
+        fb.addEventListener('blur', function() {
+          // If user didn't enter anything, restore the asterisks
+          if (this.value === '' && document.getElementById('fbTokenHint')?.textContent?.includes('Token is saved')) {
+            this.value = '********************************';
+            this.dataset.isPlaceholder = 'true';
+            this.placeholder = 'Enter new token to replace existing';
+          }
+        });
+      }
+      if (ai) {
+        ai.addEventListener('focus', function() {
+          if (this.dataset.isPlaceholder === 'true') {
+            this.value = '';
+            this.dataset.isPlaceholder = 'false';
+            this.placeholder = 'Paste your new OpenAI key here';
+          }
+        });
+        ai.addEventListener('blur', function() {
+          // If user didn't enter anything, restore the asterisks
+          if (this.value === '' && document.getElementById('openaiKeyHint')?.textContent?.includes('API key is saved')) {
+            this.value = '********************************';
+            this.dataset.isPlaceholder = 'true';
+            this.placeholder = 'Enter new key to replace existing';
+          }
+        });
+      }
       if (m) m.style.display='flex'; })(); } catch (e) { console.warn('[UI][SETTINGS] open failed', e); } }
     function closeSettings(){ const m = document.getElementById('settingsModal'); if (m) m.style.display='none'; }
     async function saveSettings(){ try { 
@@ -1537,18 +1584,22 @@
       const openaiKeyRaw = aiEl.value||''; 
       const payload = { igUserId };
       // Only include tokens if user actually entered NEW values
-      // Empty fields mean "keep existing", not "clear"
-      if (fbTokenRaw && fbTokenRaw.trim() && !/^\*\*\*/.test(fbTokenRaw)) {
+      // Check if the field contains our placeholder asterisks or real new data
+      const fbIsPlaceholder = fbEl.dataset?.isPlaceholder === 'true' || /^\*{10,}$/.test(fbTokenRaw);
+      const aiIsPlaceholder = aiEl.dataset?.isPlaceholder === 'true' || /^\*{10,}$/.test(openaiKeyRaw);
+      
+      if (fbTokenRaw && fbTokenRaw.trim() && !fbIsPlaceholder) {
         payload.fbToken = fbTokenRaw.trim();
         console.log('[UI][SETTINGS] Updating FB token (new value entered)');
-      } else if (!fbTokenRaw || !fbTokenRaw.trim()) {
-        console.log('[UI][SETTINGS] FB token field empty - keeping existing');
+      } else if (fbIsPlaceholder || !fbTokenRaw || !fbTokenRaw.trim()) {
+        console.log('[UI][SETTINGS] FB token field has placeholder or empty - keeping existing');
       }
-      if (openaiKeyRaw && openaiKeyRaw.trim() && !/^\*\*\*/.test(openaiKeyRaw)) {
+      
+      if (openaiKeyRaw && openaiKeyRaw.trim() && !aiIsPlaceholder) {
         payload.openaiKey = openaiKeyRaw.trim();
         console.log('[UI][SETTINGS] Updating OpenAI key (new value entered)');
-      } else if (!openaiKeyRaw || !openaiKeyRaw.trim()) {
-        console.log('[UI][SETTINGS] OpenAI key field empty - keeping existing');
+      } else if (aiIsPlaceholder || !openaiKeyRaw || !openaiKeyRaw.trim()) {
+        console.log('[UI][SETTINGS] OpenAI key field has placeholder or empty - keeping existing');
       }
       console.log('[UI][SETTINGS] saving', { hasIg: !!igUserId, hasFb: !!payload.fbToken, hasAi: !!payload.openaiKey });
       const saveResp = await fetch('/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
