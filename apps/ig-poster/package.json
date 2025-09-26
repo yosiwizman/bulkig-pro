@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "ts-node src/index.ts",
-    "start": "ts-node src/index.ts",
-    "build": "tsc"
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc",
+    "clean": "rimraf dist"
   },
   "dependencies": {
     "chokidar": "^3.5.0",
@@ -28,7 +29,9 @@
     "@types/mime-types": "^3.0.1",
     "@types/multer": "^2.0.0",
     "@types/node-fetch": "^2.6.0",
+    "rimraf": "^3.0.0",
     "ts-node": "^10.9.0",
+    "tsx": "^4.11.0",
     "typescript": "^5.0.0"
   }
 }
