@@ -154,9 +154,15 @@ importers:
       '@types/node-fetch':
         specifier: ^2.6.0
         version: 2.6.13
+      rimraf:
+        specifier: ^3.0.0
+        version: 3.0.2
       ts-node:
         specifier: ^10.9.0
         version: 10.9.2(@types/node@20.19.13)(typescript@5.9.2)
+      tsx:
+        specifier: ^4.11.0
+        version: 4.20.5
       typescript:
         specifier: ^5.0.0
         version: 5.9.2
