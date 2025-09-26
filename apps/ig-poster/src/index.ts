@@ -938,6 +938,35 @@ app.post('/ig/scrape-url', async (req, res) => {
   }
 });
 
+// Analyze Instagram account style
+app.post('/ig/analyze-account', async (req, res) => {
+  try {
+    const { username, forceRefresh } = req.body as { username?: string; forceRefresh?: boolean };
+    
+    if (!username) {
+      return res.status(400).json({ success: false, error: 'Username required' });
+    }
+    
+    const { getOrAnalyzeProfile } = await import('./ig-style-analyzer');
+    const analysis = await getOrAnalyzeProfile(username, forceRefresh);
+    
+    if (!analysis) {
+      return res.status(404).json({ success: false, error: 'Could not analyze account' });
+    }
+    
+    addLog('info', `[IG-ANALYZER] Analyzed @${username}`, {
+      tone: analysis.style.tone,
+      captionLength: analysis.style.captionLength,
+      hashtagCount: analysis.style.hashtagCount
+    });
+    
+    res.json({ success: true, analysis });
+  } catch (error: any) {
+    addLog('error', '[IG-ANALYZER] Analysis failed', { error: error?.message || error });
+    res.status(500).json({ success: false, error: 'Analysis failed', message: error?.message || error });
+  }
+});
+
 // AI-powered caption generation endpoint
 app.post('/ig/ai-caption', async (req, res) => {
   try {
@@ -952,6 +981,7 @@ app.post('/ig/ai-caption', async (req, res) => {
       brandName?: string;
       productName?: string;
       useAI?: boolean;
+      igUsername?: string; // Add IG username for style mimicking
     };
     
     const aiCaption = await import('./ai-caption');

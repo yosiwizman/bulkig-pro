@@ -28,6 +28,7 @@ interface CaptionRequest {
   keywords?: string[];
   brandName?: string;
   productName?: string;
+  igUsername?: string; // Instagram account to mimic style from
 }
 
 interface GeneratedCaption {
@@ -238,11 +239,31 @@ export async function generateAICaption(
       analyzedContent = await analyzeUrlContent(request.url);
     }
 
+    // Analyze Instagram account style if provided
+    let igStyle: any = null;
+    if (request.igUsername) {
+      try {
+        const { getOrAnalyzeProfile } = await import('./ig-style-analyzer');
+        const profileAnalysis = await getOrAnalyzeProfile(request.igUsername);
+        if (profileAnalysis) {
+          igStyle = profileAnalysis.style;
+          console.log(`[AI-CAPTION] Using style from @${request.igUsername}:`, {
+            tone: igStyle.tone,
+            length: igStyle.captionLength,
+            emojiUsage: igStyle.emojiUsage,
+            hashtagCount: igStyle.hashtagCount
+          });
+        }
+      } catch (error) {
+        console.warn('[AI-CAPTION] Failed to analyze IG style:', error);
+      }
+    }
+
     // Build context for GPT
-    const context = buildContextFromAnalysis(analyzedContent, request);
+    const context = buildContextFromAnalysis(analyzedContent, request, igStyle);
     
     // Create prompt for GPT
-    const prompt = createCaptionPrompt(context, request);
+    const prompt = createCaptionPrompt(context, request, igStyle);
 
     // Call OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -320,7 +341,8 @@ export async function generateAICaption(
 
 function buildContextFromAnalysis(
   analyzed: AnalyzedContent | null,
-  request: CaptionRequest
+  request: CaptionRequest,
+  igStyle?: any
 ): string {
   const parts: string[] = [];
 
@@ -366,14 +388,38 @@ function buildContextFromAnalysis(
     parts.push(`Description: ${analyzed.mainText.slice(0, 200)}`);
   }
 
+  // Add Instagram style context
+  if (igStyle) {
+    parts.push(`\nInstagram Style Reference:`);
+    parts.push(`Caption Length: ${igStyle.captionLength}`);
+    parts.push(`Tone: ${igStyle.tone}`);
+    parts.push(`Emoji Usage: ${igStyle.emojiUsage}`);
+    parts.push(`Hashtag Count: ${igStyle.hashtagCount}`);
+    parts.push(`Hashtag Placement: ${igStyle.hashtagPlacement}`);
+    if (igStyle.commonWords?.length) {
+      parts.push(`Common Words: ${igStyle.commonWords.slice(0, 10).join(', ')}`);
+    }
+    if (igStyle.ctaStyle?.length) {
+      parts.push(`CTA Style: ${igStyle.ctaStyle.slice(0, 3).join(', ')}`);
+    }
+    if (igStyle.postingPatterns) {
+      const patterns = [];
+      if (igStyle.postingPatterns.questionUsage) patterns.push('uses questions');
+      if (igStyle.postingPatterns.storyTelling) patterns.push('tells stories');
+      if (igStyle.postingPatterns.listFormat) patterns.push('uses lists');
+      if (patterns.length) parts.push(`Patterns: ${patterns.join(', ')}`);
+    }
+  }
+
   return parts.join('\n');
 }
 
-function createCaptionPrompt(context: string, request: CaptionRequest): string {
-  const style = request.style || 'medium';
-  const tone = request.tone || 'casual';
-  const includeEmojis = request.includeEmojis !== false;
-  const includeCTA = request.includeCTA !== false;
+function createCaptionPrompt(context: string, request: CaptionRequest, igStyle?: any): string {
+  // Use IG style if available, otherwise use request values
+  const style = igStyle?.captionLength || request.style || 'medium';
+  const tone = igStyle?.tone || request.tone || 'casual';
+  const includeEmojis = igStyle ? igStyle.emojiUsage !== 'none' : request.includeEmojis !== false;
+  const includeCTA = igStyle ? igStyle.ctaStyle?.length > 0 : request.includeCTA !== false;
 
   let lengthGuide = '';
   let styleGuide = '';
@@ -416,6 +462,36 @@ function createCaptionPrompt(context: string, request: CaptionRequest): string {
       break;
   }
 
+  let styleInstructions = '';
+  if (igStyle) {
+    styleInstructions = `\n\nIMPORTANT: Mimic the following Instagram account style:
+- Use ${igStyle.emojiUsage} emoji usage (${igStyle.commonEmojis?.slice(0, 5).join(' ') || 'standard emojis'})
+- Include exactly ${igStyle.hashtagCount} hashtags at the ${igStyle.hashtagPlacement}
+- Line breaks: ${igStyle.lineBreakUsage}
+${igStyle.commonWords?.length ? `- Frequently use these words: ${igStyle.commonWords.slice(0, 8).join(', ')}` : ''}
+${igStyle.ctaStyle?.length ? `- Use CTAs like: ${igStyle.ctaStyle.slice(0, 3).join(', ')}` : ''}
+${igStyle.postingPatterns?.questionUsage ? '- Include a question to encourage engagement' : ''}
+${igStyle.postingPatterns?.storyTelling ? '- Tell a brief story or anecdote' : ''}
+${igStyle.postingPatterns?.listFormat ? '- Format as a list with bullets or numbers' : ''}
+${igStyle.brandMentions?.length ? `- Mention: ${igStyle.brandMentions.slice(0, 3).join(', ')}` : ''}`;
+  }
+
+  const hashtagRequirements = igStyle ? 
+    `- Include exactly ${igStyle.hashtagCount} hashtags
+- Place hashtags: ${igStyle.hashtagPlacement === 'end' ? 'at the end in a block' : igStyle.hashtagPlacement === 'inline' ? 'throughout the caption' : 'mixed throughout and at end'}
+${igStyle.commonHashtags?.length ? `- Include these hashtags: ${igStyle.commonHashtags.slice(0, 10).join(' ')}` : ''}` :
+    `- Include 25-30 highly relevant hashtags
+- Mix of: niche-specific (5-7), medium-reach (10-12), and broad-reach (8-10) tags
+- Include trending hashtags if relevant
+- Format hashtags on separate lines at the end`;
+
+  const emojiGuide = igStyle ? 
+    (igStyle.emojiUsage === 'none' ? '- No emojis' :
+     igStyle.emojiUsage === 'minimal' ? '- Include 1-2 emojis max' :
+     igStyle.emojiUsage === 'moderate' ? '- Include 3-5 emojis' :
+     '- Use many emojis (6+ throughout)') :
+    (includeEmojis ? '- Include 3-5 relevant emojis throughout the caption' : '- No emojis');
+
   const prompt = `Create an Instagram caption with the following requirements:
 
 Context:
@@ -425,8 +501,9 @@ Style Requirements:
 - Length: ${lengthGuide}
 - Style: ${styleGuide}
 - Tone: ${toneGuide}
-${includeEmojis ? '- Include 3-5 relevant emojis throughout the caption' : '- No emojis'}
+${emojiGuide}
 ${includeCTA ? '- Include a clear call-to-action' : ''}
+${styleInstructions}
 
 Caption Structure:
 1. Hook: Start with an attention-grabbing opening
@@ -435,10 +512,7 @@ Caption Structure:
 ${includeCTA ? '4. CTA: End with clear action step' : ''}
 
 Hashtag Requirements:
-- Include 25-30 highly relevant hashtags
-- Mix of: niche-specific (5-7), medium-reach (10-12), and broad-reach (8-10) tags
-- Include trending hashtags if relevant
-- Format hashtags on separate lines at the end
+${hashtagRequirements}
 
 Additional Guidelines:
 - Use line breaks for readability
@@ -446,6 +520,7 @@ Additional Guidelines:
 - Make it shareable and save-worthy
 - Optimize for Instagram algorithm (encourage comments)
 - Sound authentic and human, not salesy
+${igStyle ? '- IMPORTANT: Match the analyzed Instagram account\'s writing style exactly' : ''}
 
 Generate the caption now:`;
 
