@@ -1451,15 +1451,21 @@
           <label>Business Account ID:</label>
           <input type="text" id="igUserId" placeholder="17841465376124483" style="width:100%; padding:8px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;">
 <label style="margin-top:8px; display:block;">Page Access Token (works for both Instagram & Facebook):</label>
-          <textarea id="fbToken" rows="3" placeholder="Paste your Meta token here" style="width:100%; padding:8px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;"></textarea>
+          <div style="position:relative;">
+            <textarea id="fbToken" rows="3" placeholder="Paste your Meta token here (or leave empty to keep existing)" style="width:100%; padding:8px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;"></textarea>
+            <div id="fbTokenStatus" style="position:absolute; top:8px; right:8px; padding:4px 8px; background:#22c55e; color:white; border-radius:4px; font-size:11px; font-weight:500; display:none;">✓ Token Saved</div>
+          </div>
           <div id="fbTokenHint" class="muted" style="font-size:11px; margin-top:4px;"></div>
         </div>
         <div class="settings-section" style="margin-bottom:16px;">
           <h3>AI Configuration</h3>
 <label>OpenAI API Key:</label>
-          <div style="display:flex; gap:8px; align-items:center;">
-            <input type="password" id="openaiKey" placeholder="Paste your OpenAI key here (sk-...)" style="flex:1; padding:8px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;">
-            <button id="btnVerifyOpenAI" class="secondary" title="Verify API key by calling OpenAI">Verify</button>
+          <div style="position:relative;">
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="password" id="openaiKey" placeholder="Paste your OpenAI key here (or leave empty to keep existing)" style="flex:1; padding:8px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;">
+              <button id="btnVerifyOpenAI" class="secondary" title="Verify API key by calling OpenAI">Verify</button>
+            </div>
+            <div id="openaiKeyStatus" style="position:absolute; top:8px; right:100px; padding:4px 8px; background:#22c55e; color:white; border-radius:4px; font-size:11px; font-weight:500; display:none;">✓ Key Saved</div>
           </div>
           <div id="openaiKeyHint" class="muted" style="font-size:11px; margin-top:4px;"></div>
         </div>
@@ -1502,15 +1508,25 @@
       } 
       // Show the hints with last 4 digits
       const fbHint = document.getElementById('fbTokenHint'); 
-      const aiHint = document.getElementById('openaiKeyHint'); 
-      if (fbHint && s && s.meta && s.meta.fbLast4) 
-        fbHint.textContent = 'Saved key ending in ••••' + s.meta.fbLast4 + (s.meta.fbSource ? ` (${s.meta.fbSource})` : ''); 
-      else if (fbHint) 
-        fbHint.textContent = 'No token saved yet';
-      if (aiHint && s && s.meta && s.meta.aiLast4) 
-        aiHint.textContent = 'Saved key ending in ••••' + s.meta.aiLast4 + (s.meta.aiSource ? ` (${s.meta.aiSource})` : ''); 
-      else if (aiHint) 
-        aiHint.textContent = 'No key saved yet';
+      const aiHint = document.getElementById('openaiKeyHint');
+      const fbStatus = document.getElementById('fbTokenStatus');
+      const aiStatus = document.getElementById('openaiKeyStatus');
+      
+      if (fbHint && s && s.meta && s.meta.fbLast4) {
+        fbHint.innerHTML = '<span style="color:#22c55e;">✅ Token is saved and active</span> • Ending in <strong>••••' + s.meta.fbLast4 + '</strong>' + (s.meta.fbSource ? ` (from ${s.meta.fbSource})` : '');
+        if (fbStatus) { fbStatus.style.display = 'block'; fbStatus.textContent = '✓ Saved'; }
+      } else if (fbHint) {
+        fbHint.innerHTML = '<span style="color:#ef4444;">⚠️ No token saved yet</span> • Please enter your Meta access token';
+        if (fbStatus) fbStatus.style.display = 'none';
+      }
+      
+      if (aiHint && s && s.meta && s.meta.aiLast4) {
+        aiHint.innerHTML = '<span style="color:#22c55e;">✅ API key is saved and active</span> • Ending in <strong>••••' + s.meta.aiLast4 + '</strong>' + (s.meta.aiSource ? ` (from ${s.meta.aiSource})` : '');
+        if (aiStatus) { aiStatus.style.display = 'block'; aiStatus.textContent = '✓ Saved'; }
+      } else if (aiHint) {
+        aiHint.innerHTML = '<span style="color:#ef4444;">⚠️ No API key saved yet</span> • Please enter your OpenAI key';
+        if (aiStatus) aiStatus.style.display = 'none';
+      }
       if (m) m.style.display='flex'; })(); } catch (e) { console.warn('[UI][SETTINGS] open failed', e); } }
     function closeSettings(){ const m = document.getElementById('settingsModal'); if (m) m.style.display='none'; }
     async function saveSettings(){ try { 
@@ -1542,24 +1558,53 @@
         const r2 = await fetch('/settings?t=' + Date.now(), { cache:'no-store' }); 
         const s2 = await r2.json(); 
         const fbHint = document.getElementById('fbTokenHint'); 
-        const aiHint = document.getElementById('openaiKeyHint'); 
+        const aiHint = document.getElementById('openaiKeyHint');
+        const fbStatus = document.getElementById('fbTokenStatus');
+        const aiStatus = document.getElementById('openaiKeyStatus');
+        
         if (fbHint) {
           if (s2 && s2.meta && s2.meta.fbLast4) {
-            fbHint.textContent = 'Saved key ending in ••••' + s2.meta.fbLast4 + (s2.meta.fbSource ? ` (${s2.meta.fbSource})` : '');
+            fbHint.innerHTML = '<span style="color:#22c55e;">✅ Token is saved and active</span> • Ending in <strong>••••' + s2.meta.fbLast4 + '</strong>' + (s2.meta.fbSource ? ` (from ${s2.meta.fbSource})` : '');
+            if (fbStatus) { fbStatus.style.display = 'block'; fbStatus.textContent = '✓ Saved'; }
           } else {
-            fbHint.textContent = 'No token saved yet';
+            fbHint.innerHTML = '<span style="color:#ef4444;">⚠️ No token saved yet</span> • Please enter your Meta access token';
+            if (fbStatus) fbStatus.style.display = 'none';
           }
         }
         if (aiHint) {
           if (s2 && s2.meta && s2.meta.aiLast4) {
-            aiHint.textContent = 'Saved key ending in ••••' + s2.meta.aiLast4 + (s2.meta.aiSource ? ` (${s2.meta.aiSource})` : '');
+            aiHint.innerHTML = '<span style="color:#22c55e;">✅ API key is saved and active</span> • Ending in <strong>••••' + s2.meta.aiLast4 + '</strong>' + (s2.meta.aiSource ? ` (from ${s2.meta.aiSource})` : '');
+            if (aiStatus) { aiStatus.style.display = 'block'; aiStatus.textContent = '✓ Saved'; }
           } else {
-            aiHint.textContent = 'No key saved yet';
+            aiHint.innerHTML = '<span style="color:#ef4444;">⚠️ No API key saved yet</span> • Please enter your OpenAI key';
+            if (aiStatus) aiStatus.style.display = 'none';
           }
         }
       } catch {}
-      showToast('success','Settings saved'); 
-      closeSettings(); 
+      // Clear the input fields after successful save to show they've been processed
+      if (payload.fbToken) {
+        const fbEl = document.getElementById('fbToken');
+        if (fbEl) {
+          fbEl.value = '';
+          fbEl.placeholder = 'Token saved! Leave empty to keep existing or paste new token to update';
+          fbEl.style.borderColor = '#22c55e';
+          setTimeout(() => { fbEl.style.borderColor = '#1e2a44'; }, 2000);
+        }
+      }
+      if (payload.openaiKey) {
+        const aiEl = document.getElementById('openaiKey');
+        if (aiEl) {
+          aiEl.value = '';
+          aiEl.placeholder = 'Key saved! Leave empty to keep existing or paste new key to update';
+          aiEl.style.borderColor = '#22c55e';
+          setTimeout(() => { aiEl.style.borderColor = '#1e2a44'; }, 2000);
+        }
+      }
+      
+      showToast('success','✅ Settings saved successfully!'); 
+      
+      // Keep the dialog open for a moment so user can see the success status
+      setTimeout(() => { closeSettings(); }, 1500);
     } catch(e){ 
       console.error('[UI][SETTINGS] save failed', e); 
       showToast('error','Save failed: ' + (e && e.message || '')); 
