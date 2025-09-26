@@ -77,6 +77,11 @@
   },
   "main": "apps/ig-poster/dist/electron/main.js",
   "build": {
+    "appId": "com.bulkig.pro",
+    "productName": "BulkIG Pro",
+    "directories": {
+      "output": "dist"
+    },
     "files": [
       "apps/ig-poster/dist/**",
       "apps/ig-poster/public/**",
@@ -85,13 +90,51 @@
       "assets/**"
     ],
     "win": {
+      "target": "nsis",
       "icon": "assets/icon.png"
     },
     "mac": {
-      "icon": "assets/icon.icns"
+      "category": "public.app-category.social-networking",
+      "icon": "assets/icon.icns",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "assets/entitlements.mac.plist",
+      "entitlementsInherit": "assets/entitlements.mac.plist"
     },
     "linux": {
-      "icon": "assets/icon.png"
+      "target": "AppImage",
+      "icon": "assets/icon.png",
+      "category": "Network"
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 110,
+          "y": 150
+        },
+        {
+          "x": 240,
+          "y": 150,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
     }
   },
   "devDependencies": {
