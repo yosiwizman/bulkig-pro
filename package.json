@@ -10,13 +10,13 @@
     "ai",
     "content-management"
   ],
-  "homepage": "https://github.com/yosiwizman/bulkig",
+  "homepage": "https://github.com/yosiwizman/bulkig-pro",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yosiwizman/bulkig.git"
+    "url": "https://github.com/yosiwizman/bulkig-pro.git"
   },
   "bugs": {
-    "url": "https://github.com/yosiwizman/bulkig/issues"
+    "url": "https://github.com/yosiwizman/bulkig-pro/issues"
   },
   "license": "UNLICENSED",
   "author": {
