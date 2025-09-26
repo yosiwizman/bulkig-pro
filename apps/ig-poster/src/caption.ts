@@ -93,8 +93,43 @@ export function generateSmartCaption(filename: string, mediaType: MediaType, sel
   return { caption: final, hashtags };
 }
 
-export function generateBatchCaptions(count: number, style: 'short' | 'medium' | 'long', keywords?: string[], urlContent?: string): { caption: string; hashtags: string[] }[] {
+export async function generateBatchCaptions(count: number, style: 'short' | 'medium' | 'long', keywords?: string[], urlContent?: string): Promise<{ caption: string; hashtags: string[] }[]> {
   const results: { caption: string; hashtags: string[] }[] = [];
+  
+  // Try to use AI for the first few captions if available
+  if (process.env.OPENAI_API_KEY && count > 0) {
+    try {
+      const aiCaption = await import('./ai-caption');
+      const aiCount = Math.min(3, count); // Generate up to 3 AI captions
+      
+      for (let i = 0; i < aiCount; i++) {
+        const tones = ['professional', 'casual', 'fun', 'inspirational', 'urgent'] as const;
+        const tone = tones[i % tones.length];
+        
+        const aiResult = await aiCaption.generateAICaption({
+          content: urlContent,
+          style: style === 'short' ? 'short' : style === 'long' ? 'long' : 'medium',
+          tone,
+          keywords,
+          includeEmojis: true,
+          includeCTA: true
+        });
+        
+        if (aiResult) {
+          results.push({
+            caption: aiResult.caption,
+            hashtags: aiResult.hashtags
+          });
+        }
+      }
+    } catch (error) {
+      console.warn('[CAPTION] AI generation failed, using templates:', error);
+    }
+  }
+  
+  // Fill the rest with template-based captions
+  const remaining = count - results.length;
+  if (remaining <= 0) return results;
   
   // Much more varied hooks based on content categories
   const baseHooks = {
@@ -223,7 +258,7 @@ export function generateBatchCaptions(count: number, style: 'short' | 'medium' |
   const desiredMinTags = 8;
   const desiredMaxTags = 12;
 
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < remaining; i++) {
     // Use different hooks/ctas for each caption to ensure uniqueness
     const hookIndex = i % hooks.length;
     const ctaIndex = i % ctas.length;

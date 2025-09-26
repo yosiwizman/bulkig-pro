@@ -906,43 +906,81 @@ const DRAFTS_FILE = path.join(__dirname, '../data/drafts.json');
 
 // Drafts API
 
-// Scrape URL for text extraction (basic)
-// Enhanced scraping with product/service detection and feature extraction
+// Enhanced URL scraping with AI caption module integration
 app.post('/ig/scrape-url', async (req, res) => {
   const url = String((req.body||{}).url||'').trim();
   try {
     if (!url) return res.json({ content: {}, rawText: '' });
-    const response = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
-    }).catch(()=>null);
-    if (!response || !response.ok) {
-      return res.json({ content: { error: 'Failed to fetch URL' }, rawText: '' });
-    }
-    const html = await response.text();
-
-    let content: any = { title:'', description:'', keywords:'', text:'' };
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const cheerio = require('cheerio');
-      const $ = cheerio.load(html);
-      $('script, style').remove();
-      content.title = $('h1').first().text() || $('title').text() || '';
-      content.description = $('meta[name="description"]').attr('content') || '';
-      content.keywords = $('meta[name="keywords"]').attr('content') || '';
-      const paragraphs = $('p').map((_: number, el: any) => $(el).text()).get().join(' ');
-      content.text = String(paragraphs).replace(/\s+/g,' ').trim().slice(0, 1000);
-    } catch (e) {
-      const safe = String(html)
-        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-        .replace(/<style[\s\S]*?<\/style>/gi, ' ');
-      const title = (/<title[^>]*>(.*?)<\/title>/i.exec(safe)?.[1] || '').replace(/<[^>]+>/g,'').trim();
-      const text = safe.replace(/<[^>]+>/g, ' ').replace(/\s+/g,' ').trim().slice(0, 1000);
-      content = { title, description:'', keywords:'', text };
-    }
-
-    res.json({ content, rawText: content.text });
+    
+    // Use the enhanced AI caption module for URL analysis
+    const aiCaption = await import('./ai-caption');
+    const analyzedContent = await aiCaption.analyzeUrlContent(url);
+    
+    // Convert to legacy format for backwards compatibility
+    const content = {
+      title: analyzedContent.title,
+      description: analyzedContent.description,
+      keywords: analyzedContent.keywords.join(', '),
+      text: analyzedContent.mainText,
+      products: analyzedContent.products,
+      services: analyzedContent.services,
+      features: analyzedContent.features,
+      benefits: analyzedContent.benefits,
+      callToAction: analyzedContent.callToAction,
+      brand: analyzedContent.brand,
+      industry: analyzedContent.industry,
+      prices: analyzedContent.prices
+    };
+    
+    res.json({ content, rawText: analyzedContent.mainText });
   } catch (error) {
     res.json({ content: { error: 'URL not accessible' }, rawText: '' });
+  }
+});
+
+// AI-powered caption generation endpoint
+app.post('/ig/ai-caption', async (req, res) => {
+  try {
+    const body = req.body as {
+      url?: string;
+      content?: string;
+      style?: 'short' | 'medium' | 'long' | 'story';
+      tone?: 'professional' | 'casual' | 'fun' | 'inspirational' | 'urgent';
+      includeEmojis?: boolean;
+      includeCTA?: boolean;
+      keywords?: string[];
+      brandName?: string;
+      productName?: string;
+      useAI?: boolean;
+    };
+    
+    const aiCaption = await import('./ai-caption');
+    
+    // Check if AI is enabled and API key is available
+    const useAI = body.useAI !== false && !!process.env.OPENAI_API_KEY;
+    
+    if (useAI) {
+      // Try AI generation first
+      const result = await aiCaption.generateAICaption(body);
+      if (result) {
+        addLog('info', '[AI-CAPTION] Generated AI caption', { style: body.style, characterCount: result.characterCount });
+        return res.json({ success: true, ...result, aiGenerated: true });
+      }
+    }
+    
+    // Fallback to enhanced template-based generation
+    let analyzedContent = null;
+    if (body.url) {
+      analyzedContent = await aiCaption.analyzeUrlContent(body.url);
+    }
+    
+    const fallbackResult = aiCaption.generateFallbackCaption(analyzedContent, body);
+    addLog('info', '[AI-CAPTION] Generated fallback caption', { style: body.style, characterCount: fallbackResult.characterCount });
+    
+    res.json({ success: true, ...fallbackResult, aiGenerated: false });
+  } catch (error: any) {
+    addLog('error', '[AI-CAPTION] Generation failed', { error: error?.message || error });
+    res.status(500).json({ success: false, error: 'Caption generation failed', message: error?.message || error });
   }
 });
 app.post('/ig/generate-drafts', async (req, res) => {
@@ -971,7 +1009,7 @@ app.post('/ig/generate-drafts', async (req, res) => {
     }
 
     const { generateBatchCaptions } = require('./caption') as typeof import('./caption');
-    const batch = generateBatchCaptions(count, style, keywords, urlContent || undefined);
+    const batch = await generateBatchCaptions(count, style, keywords, urlContent || undefined);
 
     const now = Date.now();
     const drafts = batch.map((c, i) => ({
