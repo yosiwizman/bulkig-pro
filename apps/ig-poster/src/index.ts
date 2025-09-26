@@ -1489,12 +1489,20 @@ app.get('/settings', (_req, res) => {
       }
     } catch {}
 
+    const fbRaw = fileFb || cfg.fbToken || '';
+    const aiRaw = fileAi || cfg.openaiApiKey || '';
     const out = {
       igUserId: fileIg || cfg.igUserId || '',
-      fbToken: (fileFb || cfg.fbToken) ? '***' + String(fileFb || cfg.fbToken).slice(-4) : '',
-      openaiKey: (fileAi || cfg.openaiApiKey) ? '***' + String(fileAi || cfg.openaiApiKey).slice(-4) : ''
+      fbToken: fbRaw ? '***' + String(fbRaw).slice(-4) : '',
+      openaiKey: aiRaw ? '***' + String(aiRaw).slice(-4) : '',
+      meta: {
+        fbLast4: fbRaw ? String(fbRaw).slice(-4) : '',
+        aiLast4: aiRaw ? String(aiRaw).slice(-4) : '',
+        fbSource: fileFb ? 'file' : (cfg.fbToken ? 'env' : ''),
+        aiSource: fileAi ? 'file' : (cfg.openaiApiKey ? 'env' : ''),
+      }
     };
-    console.log('[SETTINGS][GET] returning masked settings from', settingsPath);
+    console.log('[SETTINGS][GET] returning masked settings from', settingsPath, { exists: fs.existsSync(settingsPath) });
     res.json(out);
   } catch (e:any) {
     console.warn('[SETTINGS][GET] failed:', e?.message || e);

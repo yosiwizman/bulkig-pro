@@ -1450,16 +1450,18 @@
           <h3>Instagram Configuration</h3>
           <label>Business Account ID:</label>
           <input type="text" id="igUserId" placeholder="17841465376124483" style="width:100%; padding:8px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;">
-          <label style="margin-top:8px; display:block;">Page Access Token (works for both Instagram & Facebook):</label>
-          <textarea id="fbToken" rows="3" placeholder="Your Meta token - one token for both platforms" style="width:100%; padding:8px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;"></textarea>
+<label style="margin-top:8px; display:block;">Page Access Token (works for both Instagram & Facebook):</label>
+          <textarea id="fbToken" rows="3" placeholder="Paste your Meta token here" style="width:100%; padding:8px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;"></textarea>
+          <div id="fbTokenHint" class="muted" style="font-size:11px; margin-top:4px;"></div>
         </div>
         <div class="settings-section" style="margin-bottom:16px;">
           <h3>AI Configuration</h3>
 <label>OpenAI API Key:</label>
           <div style="display:flex; gap:8px; align-items:center;">
-            <input type="password" id="openaiKey" placeholder="sk-..." style="flex:1; padding:8px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;">
+            <input type="password" id="openaiKey" placeholder="Paste your OpenAI key here (sk-...)" style="flex:1; padding:8px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;">
             <button id="btnVerifyOpenAI" class="secondary" title="Verify API key by calling OpenAI">Verify</button>
           </div>
+          <div id="openaiKeyHint" class="muted" style="font-size:11px; margin-top:4px;"></div>
         </div>
         <div style="display:flex; gap:8px; justify-content:flex-end;">
           <button class="secondary" onclick="closeSettings()">Cancel</button>
@@ -1471,14 +1473,97 @@
 
   <script>
     // Settings helpers
-    function openSettings(){ try { (async ()=>{ console.log('[UI][SETTINGS] opening...'); const r = await fetch('/settings'); const s = await r.json(); console.log('[UI][SETTINGS] loaded', s); const m = document.getElementById('settingsModal'); const ig = document.getElementById('igUserId'); const fb = document.getElementById('fbToken'); const ai = document.getElementById('openaiKey'); if (ig) ig.value = s.igUserId || ''; if (fb) { fb.value = s.fbToken || ''; fb.dataset.masked = fb.value.startsWith('***') ? '1' : ''; fb.addEventListener('input', ()=>{ delete fb.dataset.masked; }); } if (ai) { ai.value = s.openaiKey || ''; ai.dataset.masked = ai.value.startsWith('***') ? '1' : ''; ai.addEventListener('input', ()=>{ delete ai.dataset.masked; }); } if (m) m.style.display='flex'; })(); } catch (e) { console.warn('[UI][SETTINGS] open failed', e); } }
+    function openSettings(){ try { (async ()=>{ console.log('[UI][SETTINGS] opening...'); const r = await fetch('/settings?t=' + Date.now(), { cache:'no-store' }); const s = await r.json(); console.log('[UI][SETTINGS] loaded', s); const m = document.getElementById('settingsModal'); const ig = document.getElementById('igUserId'); const fb = document.getElementById('fbToken'); const ai = document.getElementById('openaiKey'); 
+      // Set IG User ID (not masked)
+      if (ig) ig.value = s.igUserId || ''; 
+      // DON'T set masked values in the input fields - keep them empty so user can type new values
+      // The fields will only show placeholders, not the masked values
+      if (fb) { 
+        // Check if it's a masked value (starts with ***)
+        if (s.fbToken && s.fbToken.startsWith('***')) {
+          fb.value = ''; // Keep empty - user will see the hint below
+          fb.placeholder = 'Enter new token or keep empty to use existing';
+        } else if (s.fbToken) {
+          fb.value = s.fbToken; // Only set if it's NOT masked
+        } else {
+          fb.value = '';
+        }
+      } 
+      if (ai) { 
+        // Check if it's a masked value (starts with ***)
+        if (s.openaiKey && s.openaiKey.startsWith('***')) {
+          ai.value = ''; // Keep empty - user will see the hint below
+          ai.placeholder = 'Enter new key or keep empty to use existing';
+        } else if (s.openaiKey) {
+          ai.value = s.openaiKey; // Only set if it's NOT masked
+        } else {
+          ai.value = '';
+        }
+      } 
+      // Show the hints with last 4 digits
+      const fbHint = document.getElementById('fbTokenHint'); 
+      const aiHint = document.getElementById('openaiKeyHint'); 
+      if (fbHint && s && s.meta && s.meta.fbLast4) 
+        fbHint.textContent = 'Saved key ending in ••••' + s.meta.fbLast4 + (s.meta.fbSource ? ` (${s.meta.fbSource})` : ''); 
+      else if (fbHint) 
+        fbHint.textContent = 'No token saved yet';
+      if (aiHint && s && s.meta && s.meta.aiLast4) 
+        aiHint.textContent = 'Saved key ending in ••••' + s.meta.aiLast4 + (s.meta.aiSource ? ` (${s.meta.aiSource})` : ''); 
+      else if (aiHint) 
+        aiHint.textContent = 'No key saved yet';
+      if (m) m.style.display='flex'; })(); } catch (e) { console.warn('[UI][SETTINGS] open failed', e); } }
     function closeSettings(){ const m = document.getElementById('settingsModal'); if (m) m.style.display='none'; }
-    async function saveSettings(){ try { const igUserId = (document.getElementById('igUserId')||{}).value||''; const fbEl = (document.getElementById('fbToken')||{}); const aiEl = (document.getElementById('openaiKey')||{}); const fbTokenRaw = fbEl.value||''; const openaiKeyRaw = aiEl.value||''; const payload = { igUserId };
-      // Only include tokens if user actually entered/changed them
-      if (fbTokenRaw && !(fbEl.dataset && fbEl.dataset.masked === '1') && !fbTokenRaw.startsWith('***')) payload.fbToken = fbTokenRaw;
-      if (openaiKeyRaw && !(aiEl.dataset && aiEl.dataset.masked === '1') && !openaiKeyRaw.startsWith('***')) payload.openaiKey = openaiKeyRaw;
+    async function saveSettings(){ try { 
+      const igUserId = (document.getElementById('igUserId')||{}).value||''; 
+      const fbEl = (document.getElementById('fbToken')||{}); 
+      const aiEl = (document.getElementById('openaiKey')||{}); 
+      const fbTokenRaw = fbEl.value||''; 
+      const openaiKeyRaw = aiEl.value||''; 
+      const payload = { igUserId };
+      // Only include tokens if user actually entered NEW values
+      // Empty fields mean "keep existing", not "clear"
+      if (fbTokenRaw && fbTokenRaw.trim() && !/^\*\*\*/.test(fbTokenRaw)) {
+        payload.fbToken = fbTokenRaw.trim();
+        console.log('[UI][SETTINGS] Updating FB token (new value entered)');
+      } else if (!fbTokenRaw || !fbTokenRaw.trim()) {
+        console.log('[UI][SETTINGS] FB token field empty - keeping existing');
+      }
+      if (openaiKeyRaw && openaiKeyRaw.trim() && !/^\*\*\*/.test(openaiKeyRaw)) {
+        payload.openaiKey = openaiKeyRaw.trim();
+        console.log('[UI][SETTINGS] Updating OpenAI key (new value entered)');
+      } else if (!openaiKeyRaw || !openaiKeyRaw.trim()) {
+        console.log('[UI][SETTINGS] OpenAI key field empty - keeping existing');
+      }
       console.log('[UI][SETTINGS] saving', { hasIg: !!igUserId, hasFb: !!payload.fbToken, hasAi: !!payload.openaiKey });
-      await fetch('/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) }); showToast('success','Settings saved'); closeSettings(); } catch(e){ console.error('[UI][SETTINGS] save failed', e); showToast('error','Save failed: ' + (e && e.message || '')); } }
+      const saveResp = await fetch('/settings', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      if (!saveResp.ok) throw new Error('Save failed');
+      // Refresh hints immediately from server so user sees the new last4
+      try { 
+        const r2 = await fetch('/settings?t=' + Date.now(), { cache:'no-store' }); 
+        const s2 = await r2.json(); 
+        const fbHint = document.getElementById('fbTokenHint'); 
+        const aiHint = document.getElementById('openaiKeyHint'); 
+        if (fbHint) {
+          if (s2 && s2.meta && s2.meta.fbLast4) {
+            fbHint.textContent = 'Saved key ending in ••••' + s2.meta.fbLast4 + (s2.meta.fbSource ? ` (${s2.meta.fbSource})` : '');
+          } else {
+            fbHint.textContent = 'No token saved yet';
+          }
+        }
+        if (aiHint) {
+          if (s2 && s2.meta && s2.meta.aiLast4) {
+            aiHint.textContent = 'Saved key ending in ••••' + s2.meta.aiLast4 + (s2.meta.aiSource ? ` (${s2.meta.aiSource})` : '');
+          } else {
+            aiHint.textContent = 'No key saved yet';
+          }
+        }
+      } catch {}
+      showToast('success','Settings saved'); 
+      closeSettings(); 
+    } catch(e){ 
+      console.error('[UI][SETTINGS] save failed', e); 
+      showToast('error','Save failed: ' + (e && e.message || '')); 
+    } }
 
     // Verify OpenAI key
     async function verifyOpenAI(){
