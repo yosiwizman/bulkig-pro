@@ -119,6 +119,18 @@ function createWindow() {
     show: false,
   });
 
+  // Add right-click context menu with paste functionality
+  mainWindow.webContents.on('context-menu', (event, params) => {
+    const contextMenu = Menu.buildFromTemplate([
+      { label: 'Cut', role: 'cut', enabled: params.editFlags.canCut },
+      { label: 'Copy', role: 'copy', enabled: params.editFlags.canCopy },
+      { label: 'Paste', role: 'paste', enabled: params.editFlags.canPaste },
+      { type: 'separator' },
+      { label: 'Select All', role: 'selectAll', enabled: params.editFlags.canSelectAll },
+    ]);
+    contextMenu.popup();
+  });
+
   mainWindow.on('close', (e) => {
     if (process.platform === 'darwin') {
       e.preventDefault();

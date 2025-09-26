@@ -96,48 +96,148 @@ export function generateSmartCaption(filename: string, mediaType: MediaType, sel
 export function generateBatchCaptions(count: number, style: 'short' | 'medium' | 'long', keywords?: string[], urlContent?: string): { caption: string; hashtags: string[] }[] {
   const results: { caption: string; hashtags: string[] }[] = [];
   
+  // Much more varied hooks based on content categories
   const baseHooks = {
     short: [
-      'New post!',
-      'Quick tip.',
-      'Behind the scenes.',
-      'Today’s highlight.',
-      'Fresh inspiration.'
+      'Experience the difference',
+      'New arrivals just dropped',
+      'Transform your routine',
+      'Discover what's possible',
+      'Quality meets innovation',
+      'Your journey starts here',
+      'Elevate your game',
+      'Redefine excellence',
+      'Built for performance',
+      'Designed with purpose'
     ],
     medium: [
-      'Sharing a quick update.',
-      'Here’s something new.',
-      'Tips and insights for you.',
-      'Behind the scenes today.',
-      'What do you think?',
-      'Let’s make something great.'
+      'We're excited to share something special with you',
+      'Take your practice to the next level',
+      'Discover the perfect blend of form and function',
+      'Innovation meets tradition in our latest creation',
+      'Crafted with care for those who demand excellence',
+      'Every detail matters when you're building something great',
+      'Join thousands who have transformed their journey',
+      'See why professionals choose us for their success',
+      'Where quality and performance come together',
+      'Experience the gold standard in the industry'
     ],
     long: [
-      'Here’s a deeper dive into today’s topic.',
-      'Thoughts, ideas, and a few takeaways.',
-      'Exploring something new with you.',
-      'A story worth sharing for your audience.',
-      'Let’s connect and create together.'
+      'We've spent months perfecting every detail to bring you something truly special',
+      'From concept to creation, discover the story behind our latest innovation',
+      'Join us as we redefine what's possible in modern fitness and wellness',
+      'Years of expertise and passion come together in this remarkable offering',
+      'Discover why leading professionals trust us with their most important work',
+      'Innovation isn't just about what's new, it's about what truly makes a difference',
+      'Every great journey begins with a single step - let us guide yours',
+      'Behind every exceptional product is a story of dedication and craft',
+      'Transform not just your routine, but your entire approach to excellence',
+      'When passion meets precision, extraordinary things happen'
     ]
   };
   
+  // More varied CTAs
   const ctaOptions = {
-    short: [' Join us!', ' Try it today.', ' Learn more.'],
-    medium: [' Save this for later.', ' Ready to dive in?', ' Experience the difference.'],
-    long: [' Ready to learn more?', ' Let’s get started.', ' Join our community.']
+    short: [
+      ' Shop now!',
+      ' Link in bio.',
+      ' DM for info.',
+      ' Limited time.',
+      ' Don't miss out.',
+      ' Available today.',
+      ' Get yours.',
+      ' Learn more.',
+      ' Swipe up.',
+      ' Tag a friend.'
+    ],
+    medium: [
+      ' Visit our website to explore more.',
+      ' Send us a message to get started.',
+      ' Click the link in our bio for details.',
+      ' Share this with someone who needs it.',
+      ' Save this post for future reference.',
+      ' Drop a comment with your thoughts.',
+      ' Join our community of achievers.',
+      ' Experience the difference yourself.',
+      ' Let us know what you think below.',
+      ' Ready to take the next step?'
+    ],
+    long: [
+      ' Visit our website to discover the full collection and find your perfect match.',
+      ' Send us a message today and let's discuss how we can help you achieve your goals.',
+      ' Click the link in our bio to explore our complete range of solutions.',
+      ' Share this with your community and help spread the inspiration.',
+      ' Comment below with your experience and join the conversation.',
+      ' Book a consultation with our experts and see the difference firsthand.',
+      ' Follow our journey for more updates, tips, and exclusive content.',
+      ' Join thousands of satisfied customers who have transformed their lives.',
+      ' Tag someone who would love this and spread the positive energy.',
+      ' Subscribe to our newsletter for exclusive offers and expert insights.'
+    ]
+  };
+  
+  // Additional content variations
+  const middleContent = {
+    short: [
+      '',
+      ' Premium quality.',
+      ' Limited edition.',
+      ' Best seller.',
+      ' Customer favorite.',
+      ' Award winning.',
+      ' Handcrafted excellence.',
+      ' Sustainably made.',
+      ' Innovation defined.',
+      ' Performance driven.'
+    ],
+    medium: [
+      ' Designed for those who refuse to compromise.',
+      ' Where innovation meets everyday excellence.',
+      ' Trusted by professionals worldwide.',
+      ' Crafted with precision and care.',
+      ' Setting new standards in the industry.',
+      ' Your success is our mission.',
+      ' Quality you can see and feel.',
+      ' Making the impossible possible.',
+      ' Built to exceed expectations.',
+      ' Transforming visions into reality.'
+    ],
+    long: [
+      ' Our team of experts has carefully crafted each element to ensure maximum impact and lasting results.',
+      ' Drawing from years of research and customer feedback, we've created something truly revolutionary.',
+      ' This isn't just a product - it's a commitment to excellence and a promise of transformation.',
+      ' We believe in empowering our community with tools and knowledge that make a real difference.',
+      ' Every aspect has been thoughtfully designed to enhance your experience and exceed expectations.',
+      ' Join a growing movement of individuals who refuse to settle for anything less than extraordinary.',
+      ' Our commitment to quality and innovation has made us the trusted choice for discerning customers.',
+      ' Experience the perfect balance of form, function, and forward-thinking design.',
+      ' This is more than a purchase - it's an investment in your future success and well-being.',
+      ' Discover why industry leaders consistently choose us as their partner in excellence.'
+    ]
   };
   
   const hooks = baseHooks[style];
   const ctas = ctaOptions[style];
+  const middles = middleContent[style];
   
-  const desiredMinTags = 10;
-  const desiredMaxTags = 15;
+  const desiredMinTags = 8;
+  const desiredMaxTags = 12;
 
   for (let i = 0; i < count; i++) {
-    const hook = hooks[Math.floor(Math.random() * hooks.length)];
-    const cta = ctas[Math.floor(Math.random() * ctas.length)];
+    // Use different hooks/ctas for each caption to ensure uniqueness
+    const hookIndex = i % hooks.length;
+    const ctaIndex = i % ctas.length;
+    const middleIndex = i % middles.length;
     
-    const seed = (keywords && keywords.length ? keywords : pickDefaultKeywords(8));
+    const hook = hooks[hookIndex];
+    const cta = ctas[ctaIndex];
+    const middle = middles[middleIndex];
+    
+    // Vary the seed keywords to create different hashtag combinations
+    const seedVariation = i % 3; // Create 3 different hashtag patterns
+    const baseSeed = (keywords && keywords.length ? keywords : pickDefaultKeywords(5));
+    const extraSeed = pickDefaultKeywords(3 + seedVariation);
+    const seed = [...baseSeed, ...extraSeed];
     let hashtags = generateHashtags(seed);
     // Keep hashtags brand-agnostic (no hardcoded anchors)
 
@@ -174,15 +274,27 @@ export function generateBatchCaptions(count: number, style: 'short' | 'medium' |
     
     let caption = '';
     
+    // Create unique captions by varying the structure
+    const variation = i % 4;
+    
     switch (style) {
       case 'short':
-        caption = `${hook}${cta}`.trim();
+        if (variation === 0) caption = `${hook}. ${middle}${cta}`.trim();
+        else if (variation === 1) caption = `${middle} ${hook}.${cta}`.trim();
+        else if (variation === 2) caption = `${hook}!${cta}`.trim();
+        else caption = `${hook}. ${middle.trim() ? middle : 'Amazing.'}${cta}`.trim();
         break;
       case 'medium':
-        caption = `${hook}${cta} Sharing ideas and inspiration.`.trim();
+        if (variation === 0) caption = `${hook}. ${middle}${cta}`.trim();
+        else if (variation === 1) caption = `${hook}! ${middle} ${cta}`.trim();
+        else if (variation === 2) caption = `${middle} ${hook}. ${cta}`.trim();
+        else caption = `${hook}. ${middle ? middle + '.' : ''} ${cta}`.trim();
         break;
       case 'long':
-        caption = `${hook} ${cta} Let’s create something great together.`.trim();
+        if (variation === 0) caption = `${hook}. ${middle} ${cta}`.trim();
+        else if (variation === 1) caption = `${hook}! \n\n${middle} \n\n${cta}`.trim();
+        else if (variation === 2) caption = `${middle} \n\n${hook}. ${cta}`.trim();
+        else caption = `${hook}. \n\n${middle} \n\n${cta}`.trim();
         break;
     }
     

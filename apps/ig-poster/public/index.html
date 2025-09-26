@@ -1452,8 +1452,11 @@
           <input type="text" id="igUserId" placeholder="17841465376124483" style="width:100%; padding:8px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;">
 <label style="margin-top:8px; display:block;">Page Access Token (works for both Instagram & Facebook):</label>
           <div style="position:relative;">
-            <textarea id="fbToken" rows="3" placeholder="Paste your Meta token here (or leave empty to keep existing)" style="width:100%; padding:8px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;"></textarea>
-            <div id="fbTokenStatus" style="position:absolute; top:8px; right:8px; padding:4px 8px; background:#22c55e; color:white; border-radius:4px; font-size:11px; font-weight:500; display:none; pointer-events:none; user-select:none;">✓ Saved</div>
+            <div style="display:flex; gap:8px; align-items:flex-start;">
+              <textarea id="fbToken" rows="3" placeholder="Paste your Meta token here (or leave empty to keep existing)" style="flex:1; padding:8px; background:#0f172a; color:#e6e6e6; border:1px solid #1e2a44; border-radius:6px;"></textarea>
+              <button id="btnVerifyFacebook" class="secondary" title="Verify token with Facebook/Instagram" style="margin-top:8px;">Verify</button>
+            </div>
+            <div id="fbTokenStatus" style="position:absolute; top:8px; right:80px; padding:4px 8px; background:#22c55e; color:white; border-radius:4px; font-size:11px; font-weight:500; display:none; pointer-events:none; user-select:none;">✓ Saved</div>
           </div>
           <div id="fbTokenHint" class="muted" style="font-size:11px; margin-top:4px;"></div>
         </div>
@@ -1525,18 +1528,18 @@
       const aiStatus = document.getElementById('openaiKeyStatus');
       
       if (fbHint && s && s.meta && s.meta.fbLast4) {
-        fbHint.innerHTML = '<span style="color:#22c55e;">✅ Token is saved and active</span> • Ending in <strong>••••' + s.meta.fbLast4 + '</strong>' + (s.meta.fbSource ? ` (from ${s.meta.fbSource})` : '');
+        fbHint.innerHTML = '<span style="color:#22c55e;">Token saved</span> • Ending in <strong>••••' + s.meta.fbLast4 + '</strong>' + (s.meta.fbSource ? ` (from ${s.meta.fbSource})` : '');
         if (fbStatus) { fbStatus.style.display = 'block'; fbStatus.textContent = '✓ Saved'; }
       } else if (fbHint) {
-        fbHint.innerHTML = '<span style="color:#ef4444;">⚠️ No token saved yet</span> • Please enter your Meta access token';
+        fbHint.innerHTML = '<span style="color:#94a3b8;">No token saved yet</span>';
         if (fbStatus) fbStatus.style.display = 'none';
       }
       
       if (aiHint && s && s.meta && s.meta.aiLast4) {
-        aiHint.innerHTML = '<span style="color:#22c55e;">✅ API key is saved and active</span> • Ending in <strong>••••' + s.meta.aiLast4 + '</strong>' + (s.meta.aiSource ? ` (from ${s.meta.aiSource})` : '');
+        aiHint.innerHTML = '<span style="color:#22c55e;">API key saved</span> • Ending in <strong>••••' + s.meta.aiLast4 + '</strong>' + (s.meta.aiSource ? ` (from ${s.meta.aiSource})` : '');
         if (aiStatus) { aiStatus.style.display = 'block'; aiStatus.textContent = '✓ Saved'; }
       } else if (aiHint) {
-        aiHint.innerHTML = '<span style="color:#ef4444;">⚠️ No API key saved yet</span> • Please enter your OpenAI key';
+        aiHint.innerHTML = '<span style="color:#94a3b8;">No API key saved yet</span>';
         if (aiStatus) aiStatus.style.display = 'none';
       }
       // Add event handlers to clear asterisks when user clicks to type
@@ -1615,19 +1618,19 @@
         
         if (fbHint) {
           if (s2 && s2.meta && s2.meta.fbLast4) {
-            fbHint.innerHTML = '<span style="color:#22c55e;">✅ Token is saved and active</span> • Ending in <strong>••••' + s2.meta.fbLast4 + '</strong>' + (s2.meta.fbSource ? ` (from ${s2.meta.fbSource})` : '');
+            fbHint.innerHTML = '<span style="color:#22c55e;">Token saved</span> • Ending in <strong>••••' + s2.meta.fbLast4 + '</strong>' + (s2.meta.fbSource ? ` (from ${s2.meta.fbSource})` : '');
             if (fbStatus) { fbStatus.style.display = 'block'; fbStatus.textContent = '✓ Saved'; }
           } else {
-            fbHint.innerHTML = '<span style="color:#ef4444;">⚠️ No token saved yet</span> • Please enter your Meta access token';
+            fbHint.innerHTML = '<span style="color:#94a3b8;">No token saved yet</span>';
             if (fbStatus) fbStatus.style.display = 'none';
           }
         }
         if (aiHint) {
           if (s2 && s2.meta && s2.meta.aiLast4) {
-            aiHint.innerHTML = '<span style="color:#22c55e;">✅ API key is saved and active</span> • Ending in <strong>••••' + s2.meta.aiLast4 + '</strong>' + (s2.meta.aiSource ? ` (from ${s2.meta.aiSource})` : '');
+            aiHint.innerHTML = '<span style="color:#22c55e;">API key saved</span> • Ending in <strong>••••' + s2.meta.aiLast4 + '</strong>' + (s2.meta.aiSource ? ` (from ${s2.meta.aiSource})` : '');
             if (aiStatus) { aiStatus.style.display = 'block'; aiStatus.textContent = '✓ Saved'; }
           } else {
-            aiHint.innerHTML = '<span style="color:#ef4444;">⚠️ No API key saved yet</span> • Please enter your OpenAI key';
+            aiHint.innerHTML = '<span style="color:#94a3b8;">No API key saved yet</span>';
             if (aiStatus) aiStatus.style.display = 'none';
           }
         }
@@ -1675,6 +1678,31 @@
           showToast('success', 'OpenAI key verified');
         }
       } catch(e){ showToast('error','Network error verifying key'); }
+      finally { if (btn) { btn.disabled = false; btn.textContent = 'Verify'; } }
+    }
+    
+    // Verify Facebook/Instagram token
+    async function verifyFacebook(){
+      const btn = document.getElementById('btnVerifyFacebook');
+      const token = (document.getElementById('fbToken')||{}).value||'';
+      const userId = (document.getElementById('igUserId')||{}).value||'';
+      
+      if (!userId) {
+        showToast('error', 'Please enter Instagram Business Account ID first');
+        return;
+      }
+      
+      if (btn) { btn.disabled = true; btn.textContent = 'Verifying...'; }
+      try {
+        const r = await fetch('/verify-facebook', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ token, userId }) });
+        if (!r.ok) {
+          const t = await r.json().catch(()=>({error:'failed'}));
+          showToast('error', 'Facebook/IG verify: ' + (t.error || 'failed'));
+        } else {
+          const data = await r.json();
+          showToast('success', 'Token verified! Instagram account: @' + (data.username || 'unknown'));
+        }
+      } catch(e){ showToast('error','Network error verifying token'); }
       finally { if (btn) { btn.disabled = false; btn.textContent = 'Verify'; } }
     }
 
@@ -2380,6 +2408,7 @@
     // Attach analyze button event listener
     document.getElementById('btnAnalyzeUrl')?.addEventListener('click', analyzeUrl);
     document.getElementById('btnVerifyOpenAI')?.addEventListener('click', verifyOpenAI);
+    document.getElementById('btnVerifyFacebook')?.addEventListener('click', verifyFacebook);
     
     const btnViewDrafts = document.getElementById('btnViewDrafts');
     if (btnViewDrafts) btnViewDrafts.addEventListener('click', async () => {

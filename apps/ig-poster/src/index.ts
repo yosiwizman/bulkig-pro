@@ -1570,6 +1570,46 @@ app.post('/verify-openai', async (req, res) => {
   }
 });
 
+// Verify Facebook/Instagram token
+app.post('/verify-facebook', async (req, res) => {
+  try {
+    const body = (req.body || {}) as { token?: string; userId?: string };
+    const token = String(body.token || cfg.fbToken || '').trim();
+    const userId = String(body.userId || cfg.igUserId || '').trim();
+    
+    if (!token) return res.status(400).json({ ok: false, error: 'missing_token' });
+    if (!userId) return res.status(400).json({ ok: false, error: 'missing_user_id' });
+    
+    // Test the token by fetching user info
+    const url = `https://graph.facebook.com/v20.0/${userId}?fields=id,username&access_token=${encodeURIComponent(token)}`;
+    const r = await fetch(url).catch((e:any) => ({ ok: false, status: 0, _e: e } as any));
+    
+    if ((r as any)._e) {
+      addLog('warn', '[FACEBOOK] Verification network error');
+      return res.status(502).json({ ok: false, error: 'network_error' });
+    }
+    
+    if (!r.ok) {
+      const status = r.status || 0;
+      let errorMsg = `status_${status}`;
+      try {
+        const errData = await r.json();
+        if (errData?.error?.message) {
+          errorMsg = errData.error.message;
+        }
+      } catch {}
+      addLog('warn', '[FACEBOOK] Token verification failed', { status, error: errorMsg });
+      return res.status(status === 400 || status === 401 ? 401 : 400).json({ ok: false, error: errorMsg });
+    }
+    
+    const data = await r.json();
+    addLog('info', '[FACEBOOK] Token verified', { username: data.username }, 'SUCCESS');
+    res.json({ ok: true, username: data.username || 'Unknown', accountId: data.id });
+  } catch (e:any) {
+    res.status(500).json({ ok: false, error: 'server_error' });
+  }
+});
+
 // ==============================
 // Facebook API endpoints (Pro)
 // ==============================
@@ -1735,14 +1775,40 @@ function percentile(arr: number[], p: number): number {
 }
 
 async function probeVideo(filePath: string): Promise<{durationSec:number, width:number, height:number}> {
-  const args = ['-v','error','-print_format','json','-show_entries','format=duration:stream=index,codec_type,width,height',filePath];
-  const { stdout } = await execaRun(ffprobe.path, args, { timeout: 20000 });
-  const j = JSON.parse(stdout);
-  const durationSec = parseFloat(j?.format?.duration || '0');
-  const vstream = (j?.streams||[]).find((s:any)=> s.codec_type==='video');
-  const width = Number(vstream?.width||0);
-  const height = Number(vstream?.height||0);
-  return { durationSec, width, height };
+  try {
+    // Try using ffprobe from the static module
+    const ffprobePath = ffprobe?.path || 'ffprobe';
+    const args = ['-v','error','-print_format','json','-show_entries','format=duration:stream=index,codec_type,width,height',filePath];
+    
+    try {
+      const { stdout } = await execaRun(ffprobePath, args, { timeout: 20000 });
+      const j = JSON.parse(stdout);
+      const durationSec = parseFloat(j?.format?.duration || '0');
+      const vstream = (j?.streams||[]).find((s:any)=> s.codec_type==='video');
+      const width = Number(vstream?.width||0);
+      const height = Number(vstream?.height||0);
+      return { durationSec, width, height };
+    } catch (e: any) {
+      // Fallback: try system ffprobe if available
+      try {
+        const { stdout } = await execaRun('ffprobe', args, { timeout: 20000 });
+        const j = JSON.parse(stdout);
+        const durationSec = parseFloat(j?.format?.duration || '0');
+        const vstream = (j?.streams||[]).find((s:any)=> s.codec_type==='video');
+        const width = Number(vstream?.width||0);
+        const height = Number(vstream?.height||0);
+        return { durationSec, width, height };
+      } catch {
+        // If ffprobe fails, return fallback values
+        console.warn('[VIDEO] ffprobe not available, using fallback values for:', filePath);
+        return { durationSec: 10, width: 1080, height: 1920 }; // Default Instagram story dimensions
+      }
+    }
+  } catch (e: any) {
+    console.error('[VIDEO] Error probing video:', e?.message || e);
+    // Return safe defaults that won't block upload
+    return { durationSec: 10, width: 1080, height: 1920 };
+  }
 }
 
 async function checkFilesystemHealth(inbox: string): Promise<{ exists:boolean; writable:boolean; disk?: { drive?:string; freeMB?:number; sizeMB?:number } }>{
