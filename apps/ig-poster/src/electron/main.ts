@@ -196,6 +196,14 @@ ${alternativePaths.map(p => '- ' + p).join('\n')}
 
 function createWindow() {
   const { inbox } = getAppDataRoot();
+  
+  // If window already exists, just show it
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show();
+    mainWindow.focus();
+    return;
+  }
+  
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 860,
@@ -206,8 +214,26 @@ function createWindow() {
       webSecurity: false, // Allow loading local files
     },
     icon: getIconPath(),
-    show: false,
+    show: false, // Start hidden to avoid flash
+    center: true, // Center on screen
+    backgroundColor: '#1a1a1a', // Dark background to match loading screen
+    skipTaskbar: false, // Ensure window appears in taskbar
+    minimizable: true,
+    maximizable: true,
+    resizable: true,
+    frame: true, // Ensure window has frame
+    transparent: false, // Disable transparency which can cause issues
   });
+  
+  // Force window to show after a timeout to prevent invisible window
+  const forceShowTimeout = setTimeout(() => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      console.log('[ELECTRON] Force showing window after timeout');
+      mainWindow.show();
+      mainWindow.focus();
+      mainWindow.moveTop();
+    }
+  }, 2000); // Show after 2 seconds no matter what
 
   // Add right-click context menu with paste functionality
   mainWindow.webContents.on('context-menu', (event, params) => {
@@ -259,10 +285,12 @@ function createWindow() {
 
   mainWindow.on('ready-to-show', () => {
     try {
+      clearTimeout(forceShowTimeout); // Clear the force show timeout
       mainWindow?.show();
       // Bring to front briefly so it isn't hidden behind other windows
       mainWindow?.setAlwaysOnTop(true);
       mainWindow?.focus();
+      mainWindow?.moveTop();
       setTimeout(() => { try { mainWindow?.setAlwaysOnTop(false); } catch {} }, 1500);
     } catch {}
   });
@@ -301,15 +329,39 @@ function createTray() {
 }
 
 function getIconPath() {
-  // Fallback to png
-  const base = path.resolve(process.cwd(), 'assets');
-  const ico = path.join(base, 'icon.ico');
-  const icns = path.join(base, 'icon.icns');
-  const png = path.join(base, 'icon.png');
-  if (process.platform === 'win32' && fs.existsSync(ico)) return ico;
-  if (process.platform === 'darwin' && fs.existsSync(icns)) return icns;
-  if (fs.existsSync(png)) return png;
-  return png; // default
+  // Try multiple locations for icon
+  const possiblePaths = [
+    // Dev paths
+    path.resolve(process.cwd(), 'assets'),
+    // Packaged app paths
+    path.join(app.getAppPath(), 'assets'),
+    path.join(app.getAppPath(), '..', 'assets'),
+    path.join(process.resourcesPath, 'assets'),
+    // Fallback to app resources
+    app.getAppPath(),
+  ];
+  
+  for (const base of possiblePaths) {
+    const ico = path.join(base, 'icon.ico');
+    const icns = path.join(base, 'icon.icns');
+    const png = path.join(base, 'icon.png');
+    
+    if (process.platform === 'win32' && fs.existsSync(ico)) {
+      console.log('[ELECTRON] Found icon at:', ico);
+      return ico;
+    }
+    if (process.platform === 'darwin' && fs.existsSync(icns)) {
+      console.log('[ELECTRON] Found icon at:', icns);
+      return icns;
+    }
+    if (fs.existsSync(png)) {
+      console.log('[ELECTRON] Found icon at:', png);
+      return png;
+    }
+  }
+  
+  console.warn('[ELECTRON] No icon found in any location');
+  return undefined; // Let Electron use default
 }
 
 function startHealthMonitoring() {
@@ -394,13 +446,31 @@ function startHealthMonitoring() {
 async function bootstrap() {
   try {
     console.log('[ELECTRON] Starting bootstrap...');
+    
+    // Start server first
     startServer();
     
-    // Create window immediately but show loading state
+    // Create window immediately
     createWindow();
     
+    // Ensure window is created
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      console.error('[ELECTRON] Failed to create main window');
+      app.quit();
+      return;
+    }
+    
+    // Make sure window will be visible
+    setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+        console.log('[ELECTRON] Forcing window to show in bootstrap');
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    }, 3000);
+    
     // Show loading page while server starts
-    mainWindow?.loadURL(`data:text/html,
+    await mainWindow.loadURL(`data:text/html,
       <html>
         <head>
           <style>
@@ -535,7 +605,16 @@ async function bootstrap() {
   }
 }
 
-app.on('ready', bootstrap);
+app.on('ready', () => {
+  console.log('[ELECTRON] App is ready, starting bootstrap...');
+  bootstrap().catch(err => {
+    console.error('[ELECTRON] Bootstrap failed:', err);
+    // Show error dialog
+    const { dialog } = require('electron');
+    dialog.showErrorBox('BulkIG Pro Error', `Failed to start application: ${err.message || err}`);
+    app.quit();
+  });
+});
 
 app.on('before-quit', () => {
   // Clean up health monitoring
@@ -557,14 +636,29 @@ app.on('window-all-closed', () => {
 });
 
 app.on('activate', () => {
-  if (mainWindow === null) createWindow();
+  console.log('[ELECTRON] App activated');
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow();
+  } else {
+    mainWindow.show();
+    mainWindow.focus();
+  }
 });
 
 // Handle second instance attempt
 app.on('second-instance', () => {
+  console.log('[ELECTRON] Second instance detected, focusing existing window');
   // If someone tries to run a second instance, focus our window instead
-  if (mainWindow) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
     if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
     mainWindow.focus();
+    mainWindow.moveTop();
+    // Flash the window to get user attention
+    mainWindow.flashFrame(true);
+    setTimeout(() => mainWindow?.flashFrame(false), 1000);
+  } else {
+    // Window doesn't exist, create it
+    bootstrap();
   }
 });
