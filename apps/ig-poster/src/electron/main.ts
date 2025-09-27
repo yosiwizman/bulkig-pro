@@ -98,7 +98,7 @@ function startServer() {
   } else {
     // Spawn compiled server for production as pure Node using Electron's embedded Node runtime
     const appPath = app.getAppPath();
-    const serverEntry = path.resolve(appPath, 'apps', 'ig-poster', 'dist', 'index.js');
+    let serverEntry = path.resolve(appPath, 'apps', 'ig-poster', 'dist', 'index.js');
 
     // Minimal persistent logging for diagnostics
     const { root } = getAppDataRoot();
@@ -317,7 +317,13 @@ function createWindow() {
 }
 
 function createTray() {
-  tray = new Tray(getIconPath());
+  const iconPath = getIconPath();
+  if (!iconPath) {
+    console.warn('[ELECTRON] No icon path found, skipping tray creation');
+    return;
+  }
+  
+  tray = new Tray(iconPath);
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Open BulkIG Pro', click: () => { if (!mainWindow) createWindow(); else mainWindow.show(); } },
     { type: 'separator' },
@@ -328,7 +334,7 @@ function createTray() {
   tray.on('click', () => { if (!mainWindow) createWindow(); else mainWindow.show(); });
 }
 
-function getIconPath() {
+function getIconPath(): string | undefined {
   // Try multiple locations for icon
   const possiblePaths = [
     // Dev paths
