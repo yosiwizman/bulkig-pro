@@ -193,6 +193,25 @@ ${alternativePaths.map(p => '- ' + p).join('\n')}
       windowsHide: true,
     });
 
+    // Catch spawn errors explicitly (important on macOS hardened runtime)
+    serverProcess.on('error', (err) => {
+      console.error('[SERVER ERROR] spawn failed:', err);
+      try { fs.appendFileSync(errorLog, `\n[SPAWN ERROR] ${new Date().toISOString()} ${String(err?.stack || err)}\n`); } catch {}
+      // Surface a visible error page to the user
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.loadURL(`data:text/html,
+          <html>
+            <body style="font-family: system-ui; padding: 40px; background: #1a1a1a; color: #fff;">
+              <h1 style="color: #ff6b6b;">Failed to Start Server</h1>
+              <p>BulkIG Pro's internal server could not be launched.</p>
+              <p>Please reinstall or move the app to Applications and try again.</p>
+              <p>Error: ${String((err as any)?.message || err)}</p>
+              <p>You can also open Console logs: ~/Library/Logs/BulkIG-Pro</p>
+            </body>
+          </html>`);
+      }
+    });
+
     // Pipe logs to file with console output for debugging
     serverProcess.stdout?.on('data', (b) => { 
       console.log('[SERVER]', b.toString());
@@ -231,6 +250,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: false, // Allow loading local files
+      backgroundThrottling: false, // Ensure rendering isn't throttled while hidden
     },
     icon: getIconPath(),
     show: false, // Start hidden to avoid flash
@@ -477,9 +497,10 @@ function startHealthMonitoring() {
               <html>
                 <body style="font-family: system-ui; padding: 40px; background: #1a1a1a; color: #fff;">
                   <h1 style="color: #ff6b6b;">Recovery Failed</h1>
-                  <p>Could not restart the BulkIG Pro server. Please restart the application.</p>
-                  <button onclick="require('electron').remote.app.relaunch();require('electron').remote.app.exit(0)" 
-                    style="padding: 12px 24px; background: #22c55e; color: #fff; border: none; border-radius: 6px; font-size: 16px; margin-top: 20px; cursor: pointer;">Restart Application</button>
+                  <p>Could not restart the BulkIG Pro server.</p>
+                  <p>Please quit (Cmd+Q) and reopen the app, or use the BulkIG Pro menu → Quit, then relaunch.</p>
+                  <button onclick="location.reload()"
+                    style="padding: 12px 24px; background: #22c55e; color: #fff; border: none; border-radius: 6px; font-size: 16px; margin-top: 20px; cursor: pointer;">Reload</button>
                 </body>
               </html>`);
           }
@@ -643,7 +664,8 @@ async function bootstrap() {
               <li>Check if port 4011 is already in use</li>
             </ol>
             <button onclick="location.href='http://localhost:4011'">Retry Connection</button>
-            <button onclick="require('electron').remote.app.relaunch();require('electron').remote.app.exit(0)">Restart App</button>
+            <button onclick="location.reload()">Reload</button>
+            <p>If reloading doesn't help, quit (Cmd+Q) and reopen the app.</p>
             <div class="logs">
               <p>Debug Information:</p>
               <p>Platform: ${process.platform}</p>

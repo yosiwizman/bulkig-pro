@@ -100,6 +100,7 @@
       "!node_modules/**/.github"
     ],
     "asarUnpack": [
+      "apps/ig-poster/dist/**",
       "node_modules/whatwg-url/**",
       "node_modules/tr46/**",
       "node_modules/webidl-conversions/**",
