@@ -16,6 +16,7 @@ let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let serverProcess: ChildProcess | null = null;
 let healthCheckInterval: NodeJS.Timeout | null = null;
+let isQuitting = false; // Track app quit state
 
 function getAppDataRoot() {
   const root = path.join(app.getPath('userData'), 'BulkIG-Pro');
@@ -296,7 +297,7 @@ function createWindow() {
 
   mainWindow.on('close', (e) => {
     // On macOS, only prevent close if we're not actually quitting the app
-    if (process.platform === 'darwin' && !app.isQuitting) {
+    if (process.platform === 'darwin' && !isQuitting) {
       e.preventDefault();
       mainWindow?.hide();
       // Keep app in dock but hide window
@@ -364,7 +365,7 @@ function createTray() {
     }},
     { type: 'separator' },
     { label: 'Quit', click: () => { 
-      (app as any).isQuitting = true;
+      isQuitting = true;
       app.quit(); 
     }},
   ]);
@@ -677,7 +678,7 @@ app.on('ready', () => {
             label: 'Quit BulkIG Pro', 
             accelerator: 'Command+Q',
             click: () => {
-              (app as any).isQuitting = true;
+              isQuitting = true;
               app.quit();
             }
           },
@@ -733,7 +734,7 @@ app.on('ready', () => {
 
 app.on('before-quit', () => {
   // Mark that we're actually quitting
-  (app as any).isQuitting = true;
+  isQuitting = true;
   
   // Clean up health monitoring
   if (healthCheckInterval) {
