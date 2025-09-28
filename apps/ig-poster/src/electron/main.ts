@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, Tray } from 'electron';
+import { app, BrowserWindow, Menu, Tray, dialog } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { spawn, type ChildProcess } from 'child_process';
@@ -32,12 +32,24 @@ async function waitForServer(base = 'http://localhost:4011', timeoutMs = 30000) 
   
   console.log(`[ELECTRON] Waiting for server at ${base}...`);
   
+  // On macOS, give extra time for server to start
+  if (process.platform === 'darwin') {
+    timeoutMs = Math.max(timeoutMs, 45000);
+  }
+  
   while (Date.now() - start < timeoutMs) {
     attempts++;
     try {
       // Try both base URL and health endpoint
       const healthEndpoint = `${base}/health`;
-      const r = await fetch(healthEndpoint, { timeout: 2000 as any });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      
+      const r = await fetch(healthEndpoint, { 
+        signal: controller.signal,
+        // @ts-ignore - node-fetch supports timeout
+        timeout: 2000 
+      }).finally(() => clearTimeout(timeoutId));
       
       if (r.ok || r.status < 500) {
         console.log(`[ELECTRON] Server responded after ${attempts} attempts (${Date.now() - start}ms)`);
@@ -60,6 +72,12 @@ async function waitForServer(base = 'http://localhost:4011', timeoutMs = 30000) 
 }
 
 function startServer() {
+  // Don't start multiple servers
+  if (serverProcess && !serverProcess.killed) {
+    console.log('[ELECTRON] Server already running');
+    return;
+  }
+  
   const { inbox, license, root } = getAppDataRoot();
 
   // Load saved settings and inject into env before spawning
@@ -277,9 +295,12 @@ function createWindow() {
   });
 
   mainWindow.on('close', (e) => {
-    if (process.platform === 'darwin') {
+    // On macOS, only prevent close if we're not actually quitting the app
+    if (process.platform === 'darwin' && !app.isQuitting) {
       e.preventDefault();
       mainWindow?.hide();
+      // Keep app in dock but hide window
+      return false;
     }
   });
 
@@ -300,20 +321,26 @@ function createWindow() {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 
-  // Try to load the server URL
-  mainWindow.loadURL('http://localhost:4011').catch((error) => {
-    console.error('[ELECTRON] Failed to load URL:', error);
-    // Fallback to loading the HTML file directly
-    const htmlPath = app.isPackaged
-      ? path.join(app.getAppPath(), 'apps', 'ig-poster', 'public', 'index.html')
-      : path.join(__dirname, '..', '..', 'public', 'index.html');
-    
-    if (fs.existsSync(htmlPath)) {
-      mainWindow?.loadFile(htmlPath);
-    } else {
-      console.error('[ELECTRON] HTML file not found at:', htmlPath);
-    }
-  });
+  // Don't immediately try to load server URL, wait for bootstrap to handle it
+  // This prevents race conditions on macOS where the window loads before server is ready
+  if (process.platform === 'darwin') {
+    console.log('[ELECTRON] Deferring URL load on macOS to bootstrap');
+  } else {
+    // On other platforms, attempt load
+    mainWindow.loadURL('http://localhost:4011').catch((error) => {
+      console.error('[ELECTRON] Failed to load URL:', error);
+      // Fallback to loading the HTML file directly
+      const htmlPath = app.isPackaged
+        ? path.join(app.getAppPath(), 'apps', 'ig-poster', 'public', 'index.html')
+        : path.join(__dirname, '..', '..', 'public', 'index.html');
+      
+      if (fs.existsSync(htmlPath)) {
+        mainWindow?.loadFile(htmlPath);
+      } else {
+        console.error('[ELECTRON] HTML file not found at:', htmlPath);
+      }
+    });
+  }
 }
 
 function createTray() {
@@ -325,9 +352,21 @@ function createTray() {
   
   tray = new Tray(iconPath);
   const contextMenu = Menu.buildFromTemplate([
-    { label: 'Open BulkIG Pro', click: () => { if (!mainWindow) createWindow(); else mainWindow.show(); } },
+    { label: 'Open BulkIG Pro', click: () => { 
+      if (!mainWindow) {
+        createWindow();
+      } else {
+        mainWindow.show();
+        if (process.platform === 'darwin') {
+          app.dock.show(); // Show dock icon on macOS when opening from tray
+        }
+      }
+    }},
     { type: 'separator' },
-    { label: 'Quit', click: () => { app.quit(); } },
+    { label: 'Quit', click: () => { 
+      (app as any).isQuitting = true;
+      app.quit(); 
+    }},
   ]);
   tray.setToolTip('BulkIG Pro');
   tray.setContextMenu(contextMenu);
@@ -466,6 +505,13 @@ async function bootstrap() {
       return;
     }
     
+    // On macOS, ensure the window is visible and focused
+    if (process.platform === 'darwin') {
+      mainWindow.show();
+      mainWindow.focus();
+      app.dock?.show();
+    }
+    
     // Make sure window will be visible
     setTimeout(() => {
       if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
@@ -526,8 +572,9 @@ async function bootstrap() {
         </body>
       </html>`);
     
-    // Wait for server with reduced initial timeout for faster feedback
-    const initialOk = await waitForServer('http://localhost:4011', 15000);
+    // Wait for server with platform-specific timeout
+    const initialTimeout = process.platform === 'darwin' ? 25000 : 15000;
+    const initialOk = await waitForServer('http://localhost:4011', initialTimeout);
     
     if (initialOk) {
       console.log('[ELECTRON] Server is ready, loading application...');
@@ -613,16 +660,81 @@ async function bootstrap() {
 
 app.on('ready', () => {
   console.log('[ELECTRON] App is ready, starting bootstrap...');
+  
+  // Setup macOS menu bar
+  if (process.platform === 'darwin') {
+    const template: Electron.MenuItemConstructorOptions[] = [
+      {
+        label: 'BulkIG Pro',
+        submenu: [
+          { label: 'About BulkIG Pro', role: 'about' },
+          { type: 'separator' },
+          { label: 'Hide BulkIG Pro', role: 'hide', accelerator: 'Command+H' },
+          { label: 'Hide Others', role: 'hideOthers', accelerator: 'Command+Shift+H' },
+          { label: 'Show All', role: 'unhide' },
+          { type: 'separator' },
+          { 
+            label: 'Quit BulkIG Pro', 
+            accelerator: 'Command+Q',
+            click: () => {
+              (app as any).isQuitting = true;
+              app.quit();
+            }
+          },
+        ],
+      },
+      {
+        label: 'Edit',
+        submenu: [
+          { label: 'Undo', role: 'undo', accelerator: 'Command+Z' },
+          { label: 'Redo', role: 'redo', accelerator: 'Shift+Command+Z' },
+          { type: 'separator' },
+          { label: 'Cut', role: 'cut', accelerator: 'Command+X' },
+          { label: 'Copy', role: 'copy', accelerator: 'Command+C' },
+          { label: 'Paste', role: 'paste', accelerator: 'Command+V' },
+          { label: 'Select All', role: 'selectAll', accelerator: 'Command+A' },
+        ],
+      },
+      {
+        label: 'View',
+        submenu: [
+          { label: 'Reload', role: 'reload', accelerator: 'Command+R' },
+          { label: 'Force Reload', role: 'forceReload', accelerator: 'Command+Shift+R' },
+          { label: 'Toggle Developer Tools', role: 'toggleDevTools', accelerator: 'F12' },
+          { type: 'separator' },
+          { label: 'Actual Size', role: 'resetZoom', accelerator: 'Command+0' },
+          { label: 'Zoom In', role: 'zoomIn', accelerator: 'Command+Plus' },
+          { label: 'Zoom Out', role: 'zoomOut', accelerator: 'Command+-' },
+          { type: 'separator' },
+          { label: 'Toggle Fullscreen', role: 'togglefullscreen', accelerator: 'Control+Command+F' },
+        ],
+      },
+      {
+        label: 'Window',
+        submenu: [
+          { label: 'Minimize', role: 'minimize', accelerator: 'Command+M' },
+          { label: 'Close', role: 'close', accelerator: 'Command+W' },
+          { type: 'separator' },
+          { label: 'Bring All to Front', role: 'front' },
+        ],
+      },
+    ];
+    
+    const menu = Menu.buildFromTemplate(template);
+    Menu.setApplicationMenu(menu);
+  }
+  
   bootstrap().catch(err => {
     console.error('[ELECTRON] Bootstrap failed:', err);
-    // Show error dialog
-    const { dialog } = require('electron');
     dialog.showErrorBox('BulkIG Pro Error', `Failed to start application: ${err.message || err}`);
     app.quit();
   });
 });
 
 app.on('before-quit', () => {
+  // Mark that we're actually quitting
+  (app as any).isQuitting = true;
+  
   // Clean up health monitoring
   if (healthCheckInterval) {
     clearInterval(healthCheckInterval);
@@ -631,23 +743,37 @@ app.on('before-quit', () => {
   
   try { tray?.destroy(); } catch {}
   if (serverProcess && !serverProcess.killed) {
-    try { serverProcess.kill('SIGTERM'); } catch {}
+    try { 
+      // Use SIGKILL on macOS for more reliable process termination
+      if (process.platform === 'darwin') {
+        serverProcess.kill('SIGKILL');
+      } else {
+        serverProcess.kill('SIGTERM');
+      }
+    } catch {}
   }
 });
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
+  } else {
+    // On macOS, keep app running but hide dock icon when all windows closed
+    app.dock?.hide();
   }
 });
 
 app.on('activate', () => {
   console.log('[ELECTRON] App activated');
   if (!mainWindow || mainWindow.isDestroyed()) {
-    createWindow();
+    // On macOS, recreate window when dock icon clicked and no windows exist
+    bootstrap();
   } else {
     mainWindow.show();
     mainWindow.focus();
+    if (process.platform === 'darwin') {
+      app.dock?.show(); // Ensure dock icon is visible
+    }
   }
 });
 
