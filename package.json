@@ -84,8 +84,8 @@
     "directories": {
       "output": "dist"
     },
-    "asar": true,
-    "npmRebuild": true,
+    "asar": false,
+    "npmRebuild": false,
     "nodeGypRebuild": false,
     "buildDependenciesFromSource": false,
     "files": [
@@ -95,17 +95,17 @@
       "package.json",
       "assets/**",
       "!node_modules/**/test/**",
+      "!node_modules/**/tests/**",
       "!node_modules/**/*.md",
       "!node_modules/**/*.map",
-      "!node_modules/**/.github"
+      "!node_modules/**/.github",
+      "!node_modules/**/.gitignore",
+      "!node_modules/**/README.md",
+      "!node_modules/**/LICENSE"
     ],
     "asarUnpack": [
       "apps/ig-poster/dist/**",
-      "node_modules/whatwg-url/**",
-      "node_modules/tr46/**",
-      "node_modules/webidl-conversions/**",
-      "node_modules/ffprobe-static/**",
-      "node_modules/cloudflared/**"
+      "node_modules/**"
     ],
     "win": {
       "target": "nsis",
@@ -178,6 +178,7 @@
     "node-fetch": "^2.6.7",
     "whatwg-url": "^5.0.0",
     "express": "^4.18.0",
+    "body-parser": "^1.20.2",
     "cors": "^2.8.5",
     "multer": "^1.4.5-lts.1",
     "mime-types": "^2.1.35",
